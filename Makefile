@@ -33,7 +33,7 @@
 # GPL.
 
 # This is the full version of the libst library - modify carefully
-VERSION     = 1.6
+VERSION     = 1.7
 
 ##########################
 # Supported OSes:
@@ -46,7 +46,6 @@ VERSION     = 1.6
 #OS         = IRIX
 #OS         = IRIX_64
 #OS         = LINUX
-#OS         = LINUX_IA64
 #OS         = NETBSD
 #OS         = OPENBSD
 #OS         = OSF1
@@ -92,7 +91,6 @@ TARGETS     = aix-debug aix-optimized               \
               irix-n32-debug irix-n32-optimized     \
               irix-64-debug irix-64-optimized       \
               linux-debug linux-optimized           \
-              linux-ia64-debug linux-ia64-optimized \
               netbsd-debug netbsd-optimized         \
               openbsd-debug openbsd-optimized       \
               osf1-debug osf1-optimized             \
@@ -167,11 +165,8 @@ LDFLAGS     = $(ABIFLAG) -shared
 OTHER_FLAGS = -fullwarn
 endif
 
-ifeq (LINUX, $(findstring LINUX, $(OS)))
-ifeq ($(OS), LINUX_IA64)
-DEFINES     = -DLINUX
-EXTRA_OBJS  = $(TARGETDIR)/ia64asm.o
-endif
+ifeq ($(OS), LINUX)
+EXTRA_OBJS  = $(TARGETDIR)/md.o
 SFLAGS      = -fPIC
 LDFLAGS     = -shared -soname=$(SONAME) -lc
 OTHER_FLAGS = -Wall
@@ -326,7 +321,7 @@ $(HEADER): public.h
 	rm -f $@
 	cp public.h $@
 
-$(TARGETDIR)/%asm.o: %asm.S
+$(TARGETDIR)/md.o: md.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(TARGETDIR)/%.o: %.c common.h md.h
@@ -401,10 +396,9 @@ linux-debug:
 	$(MAKE) OS="LINUX" BUILD="DBG"
 linux-optimized:
 	$(MAKE) OS="LINUX" BUILD="OPT"
-linux-ia64-debug:
-	$(MAKE) OS="LINUX_IA64" BUILD="DBG"
-linux-ia64-optimized:
-	$(MAKE) OS="LINUX_IA64" BUILD="OPT"
+# compatibility
+linux-ia64-debug: linux-debug
+linux-ia64-optimized: linux-optimized
 
 netbsd-debug:
 	$(MAKE) OS="NETBSD" BUILD="DBG"
