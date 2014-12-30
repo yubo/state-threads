@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+ * Portions created by SGI are Copyright (C) 2000 Silicon Graphics, Inc.
+ * All Rights Reserved.
  *
  * The internal __jmp_buf layout is different from one used
  * by setjmp()/longjmp().

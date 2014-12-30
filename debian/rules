@@ -1,0 +1,62 @@
+#!/usr/bin/make -f
+# GNU copyright 1997 to 1999 by Joey Hess.
+# GNU copyright 2001-2002 by Wesley W. Terpstra
+
+#export DH_VERBOSE=1
+export DH_COMPAT=2
+
+DSTDIR=$(CURDIR)/debian/tmp/usr
+
+configure:
+
+build: build-stamp
+build-stamp:
+	dh_testdir
+	make CONFIG_GUESS_PATH=/usr/share/automake default-optimized
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	make clean
+	rm -f build-stamp
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+	dh_installdirs
+	
+	mkdir -m 0755 -p $(DSTDIR)/lib/pkgconfig
+	mkdir -m 0755 -p $(DSTDIR)/include
+	mkdir -m 0755 -p $(DSTDIR)/share/doc/libst-dev
+	cp -a obj/libst.* $(DSTDIR)/lib
+	cp -a obj/st.h    $(DSTDIR)/include
+	sed "s*@prefix@*/usr*g" <st.pc >$(DSTDIR)/lib/pkgconfig/st.pc
+	cp -a docs/*      $(DSTDIR)/share/doc/libst-dev/
+	cp -a examples    $(DSTDIR)/share/doc/libst-dev/
+
+binary-indep:
+
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_movefiles
+
+	dh_installdocs
+	dh_installexamples
+	dh_installchangelogs
+	dh_link
+	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_makeshlibs
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-arch
+.PHONY: build clean binary-indep binary-arch binary configure install

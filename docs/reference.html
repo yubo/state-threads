@@ -82,7 +82,9 @@
 <DL><DD><A HREF=#connect>st_connect()</A></DD></DL>
 <DL><DD><A HREF=#read>st_read()</A></DD></DL>
 <DL><DD><A HREF=#read_fully>st_read_fully()</A></DD></DL>
+<DL><DD><A HREF=#read_resid>st_read_resid()</A></DD></DL>
 <DL><DD><A HREF=#write>st_write()</A></DD></DL>
+<DL><DD><A HREF=#write_resid>st_write_resid()</A></DD></DL>
 <DL><DD><A HREF=#writev>st_writev()</A></DD></DL>
 <DL><DD><A HREF=#recvfrom>st_recvfrom()</A></DD></DL>
 <DL><DD><A HREF=#sendto>st_sendto()</A></DD></DL>
@@ -1344,7 +1346,9 @@ forever (never time out), respectively.
 <DD><A HREF=#connect>st_connect()</A></DD>
 <DD><A HREF=#read>st_read()</A></DD>
 <DD><A HREF=#read_fully>st_read_fully()</A></DD>
+<DD><A HREF=#read_resid>st_read_resid()</A></DD>
 <DD><A HREF=#write>st_write()</A></DD>
+<DD><A HREF=#write_resid>st_write_resid()</A></DD>
 <DD><A HREF=#writev>st_writev()</A></DD>
 <DD><A HREF=#recvfrom>st_recvfrom()</A></DD>
 <DD><A HREF=#sendto>st_sendto()</A></DD>
@@ -1912,7 +1916,7 @@ call with two exceptions:<P>
 <TABLE BORDER=0>
 <TR><TD><TT>EINTR </TT></TD><TD>The current thread was interrupted by
 <A HREF=#thread_interrupt>st_thread_interrupt()</A>.</TD></TR>
-<TR><TD><TT>ETIME </TT></TD><TD>The timeout occurred and no data was read.
+<TR><TD><TT>ETIME </TT></TD><TD>The timeout occurred.
 </TD></TR>
 </TABLE>
 <P>
@@ -1920,6 +1924,63 @@ call with two exceptions:<P>
 This function blocks the calling thread until the specified amount of data
 is read in full, it encounters an end-of-stream indication, a timeout occurs,
 or an error occurs.
+<P>
+<HR>
+<P>
+<A NAME="read_resid">
+<H4>st_read_resid()</H4>
+</A>
+Reads the specified amount of data in full from a file descriptor object.
+<P>
+<H5>Syntax</H5>
+
+<PRE>
+#include &lt;st.h&gt;
+
+int st_read_resid(st_netfd_t fd, void *buf, size_t *resid,
+		  st_utime_t timeout);
+</PRE>
+<P>
+<H5>Parameters</H5>
+<TT>st_read_resid()</TT> has the following parameters:<P>
+<TT>fd</TT><P>
+A file descriptor object identifier (see
+<A HREF=#netfd_t><B>st_netfd_t</B></A>).<P>
+<TT>buf</TT><P>
+A pointer to a buffer to hold the data read in. On output the buffer
+contains the data.<P>
+<TT>resid</TT><P>
+A pointer to a number of bytes.
+On entry, the amount of data to be read in full.
+It must not exceed the size of <TT>buf</TT>.
+On return, the amount of data remaining to be read.
+(A non-zero returned value means some but not all of the data was read.)<P>
+<TT>timeout</TT><P>
+A value of type <A HREF=#utime_t><B>st_utime_t</B></A> specifying the
+inactivity timeout (in microseconds).
+<P>
+<H5>Returns</H5>
+On success, zero is returned.  <TT>*resid</TT> may be zero, indicating
+a complete read, or non-zero, indicating the network
+connection is closed or end of file is reached.
+<P>
+Otherwise, a value of <TT>-1</TT> is returned, <TT>*resid</TT> is non-zero,
+and <TT>errno</TT> is set to indicate the error.
+Possible <TT>errno</TT> values are the same as set by the <TT>read(2)</TT>
+call with two exceptions:<P>
+<TABLE BORDER=0>
+<TR><TD><TT>EINTR </TT></TD><TD>The current thread was interrupted by
+<A HREF=#thread_interrupt>st_thread_interrupt()</A>.</TD></TR>
+<TR><TD><TT>ETIME </TT></TD><TD>The timeout occurred.
+</TD></TR>
+</TABLE>
+<P>
+<H5>Description</H5>
+This function blocks the calling thread until the specified amount of data
+is read in full, it encounters an end-of-stream indication, a timeout occurs,
+or an error occurs.  It differs from <TT>st_read_fully()</TT> only in that
+it allows the caller to know how many bytes were transferred before an error
+occurred.
 <P>
 <HR>
 <P>
@@ -1958,7 +2019,7 @@ by the <TT>write(2)</TT> call with two exceptions:<P>
 <TABLE BORDER=0>
 <TR><TD><TT>EINTR </TT></TD><TD>The current thread was interrupted by
 <A HREF=#thread_interrupt>st_thread_interrupt()</A>.</TD></TR>
-<TR><TD><TT>ETIME </TT></TD><TD>The timeout occurred and no data was written.
+<TR><TD><TT>ETIME </TT></TD><TD>The timeout occurred.
 </TD></TR>
 </TABLE> 
 <P>
@@ -1968,6 +2029,57 @@ a timeout occurs, or the write operation fails. The return value is equal to
 either <TT>nbyte</TT> (on success) or <TT>-1</TT> (on failure). Note that if
 <TT>st_write()</TT> returns <TT>-1</TT>, some data (less than <TT>nbyte</TT>
 bytes) may have been written before an error occurred.
+<P>
+<HR>
+<P>
+<A NAME="write_resid">
+<H4>st_write_resid()</H4>
+</A>
+Writes a buffer of data to a specified file descriptor object.
+<P>
+<H5>Syntax</H5>
+
+<PRE>
+#include &lt;st.h&gt;
+
+int st_write_resid(st_netfd_t fd, const void *buf, size_t *resid,
+                   st_utime_t timeout);
+</PRE>
+<P>
+<H5>Parameters</H5>
+<TT>st_write_resid()</TT> has the following parameters:<P>
+<TT>fd</TT><P>
+A file descriptor object identifier (see
+<A HREF=#netfd_t><B>st_netfd_t</B></A>).<P>
+<TT>buf</TT><P>
+A pointer to the buffer holding the data to be written.<P>
+<TT>resid</TT><P>
+A pointer to a number of bytes.
+On entry, the amount of data to be written from the buffer.
+On return, the amount of data remaining to be written.
+(A non-zero returned value means some but not all of the data was written.)<P>
+<TT>timeout</TT><P>
+A value of type <A HREF=#utime_t><B>st_utime_t</B></A> specifying the
+inactivity timeout (in microseconds).
+<P>
+<H5>Returns</H5>
+On success, zero is returned and <TT>*resid</TT> is zero.
+Otherwise, a value of <TT>-1</TT> is returned, <TT>*resid</TT> is non-zero,
+and <TT>errno</TT> is set
+to indicate the error. Possible <TT>errno</TT> values are the same as set
+by the <TT>write(2)</TT> call with two exceptions:<P>
+<TABLE BORDER=0>
+<TR><TD><TT>EINTR </TT></TD><TD>The current thread was interrupted by
+<A HREF=#thread_interrupt>st_thread_interrupt()</A>.</TD></TR>
+<TR><TD><TT>ETIME </TT></TD><TD>The timeout occurred.
+</TD></TR>
+</TABLE> 
+<P>
+<H5>Description</H5>
+This function blocks the calling thread until <I>all</I> the data is written,
+a timeout occurs, or the write operation fails. It differs from
+<TT>st_write()</TT> only in that it allows the caller to know how many bytes
+were transferred before an error occurred.
 <P>
 <HR>
 <P>
@@ -2007,7 +2119,7 @@ set by the <TT>writev(2)</TT> call with two exceptions:<P>
 <TABLE BORDER=0>
 <TR><TD><TT>EINTR </TT></TD><TD>The current thread was interrupted by
 <A HREF=#thread_interrupt>st_thread_interrupt()</A>.</TD></TR>
-<TR><TD><TT>ETIME </TT></TD><TD>The timeout occurred and no data was written.
+<TR><TD><TT>ETIME </TT></TD><TD>The timeout occurred.
 </TD></TR>
 </TABLE>
 <P>
@@ -2309,7 +2421,9 @@ Only the following functions can block the calling thread:
 <DD><A HREF=#connect>st_connect()</A></DD>
 <DD><A HREF=#read>st_read()</A></DD>
 <DD><A HREF=#read_fully>st_read_fully()</A></DD>
+<DD><A HREF=#read_resid>st_read_resid()</A></DD>
 <DD><A HREF=#write>st_write()</A></DD>
+<DD><A HREF=#write_resid>st_write_resid()</A></DD>
 <DD><A HREF=#writev>st_writev()</A></DD>
 <DD><A HREF=#recvfrom>st_recvfrom()</A></DD>
 <DD><A HREF=#sendto>st_sendto()</A></DD>

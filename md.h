@@ -96,11 +96,19 @@
 #define MD_SETJMP(env) _setjmp(env)
 #define MD_LONGJMP(env, val) _longjmp(env, val)
 
-#define MD_INIT_CONTEXT(_thread, _sp, _main)   \
-  ST_BEGIN_MACRO                               \
-  (void) MD_SETJMP((_thread)->context);        \
-  (_thread)->context[0]._jb[0] = (long) _main; \
-  (_thread)->context[0]._jb[2] = (long) (_sp); \
+#if defined(__i386__)
+#define MD_JB_SP   2
+#elif defined(__alpha__)
+#define MD_JB_SP  34
+#else
+#error Unknown CPU architecture
+#endif
+
+#define MD_INIT_CONTEXT(_thread, _sp, _main)          \
+  ST_BEGIN_MACRO                                      \
+  if (MD_SETJMP((_thread)->context))                  \
+    _main();                                          \
+  (_thread)->context[0]._jb[MD_JB_SP] = (long) (_sp); \
   ST_END_MACRO
 
 #define MD_GET_UTIME()            \
@@ -206,9 +214,9 @@
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main)            \
   ST_BEGIN_MACRO                                        \
-  (void) MD_SETJMP((_thread)->context);                 \
+  if (MD_SETJMP((_thread)->context))                    \
+    _main();                                            \
   (_thread)->context[0].__jmpbuf[JB_SP] = (long) (_sp); \
-  (_thread)->context[0].__jmpbuf[JB_PC] = (long) _main; \
   ST_END_MACRO
 #else
 /* IA-64 architecture */
@@ -247,11 +255,19 @@ extern void _ia64_cxt_restore(jmp_buf env, int val);
 #define MD_SETJMP(env) _setjmp(env)
 #define MD_LONGJMP(env, val) _longjmp(env, val)
 
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO                             \
-  (void) MD_SETJMP((_thread)->context);      \
-  (_thread)->context[0] = (long) _main;      \
-  (_thread)->context[2] = (long) (_sp);      \
+#if defined(__i386__)
+#define MD_JB_SP   2
+#elif defined(__alpha__)
+#define MD_JB_SP  34
+#else
+#error Unknown CPU architecture
+#endif
+
+#define MD_INIT_CONTEXT(_thread, _sp, _main)   \
+  ST_BEGIN_MACRO                               \
+  if (MD_SETJMP((_thread)->context))           \
+    _main();                                   \
+  (_thread)->context[MD_JB_SP] = (long) (_sp); \
   ST_END_MACRO
 
 #define MD_GET_UTIME()            \
@@ -324,7 +340,7 @@ extern int getpagesize(void);
 #define MD_STACK_PAD_SIZE 128
 #endif
 
-#ifndef MD_HAVE_SOCKLEN_T
+#if !defined(MD_HAVE_SOCKLEN_T) && !defined(socklen_t)
 #define socklen_t int
 #endif
 

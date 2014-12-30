@@ -164,6 +164,9 @@ typedef struct _st_thread {
 
   st_clist_t links;           /* For putting on run/sleep/zombie queue */
   st_clist_t wait_links;      /* For putting on mutex/condvar wait queue */
+#ifdef DEBUG
+  st_clist_t tlink;           /* For putting on thread queue */
+#endif
   st_utime_t sleep;           /* Sleep time when thread is sleeping */
 
   void **private_data;        /* Per thread private data */
@@ -197,6 +200,9 @@ typedef struct _st_vp {
   st_clist_t io_q;            /* io queue for this vp */
   st_clist_t sleep_q;         /* sleep queue for this vp */
   st_clist_t zombie_q;        /* zombie queue for this vp */
+#ifdef DEBUG
+  st_clist_t thread_q;        /* all threads of this vp */
+#endif
   st_utime_t sleep_max;
   int pagesize;
 
@@ -255,6 +261,10 @@ extern st_thread_t  *_st_this_thread;
 #define _ST_SLEEPQ                      (_st_this_vp.sleep_q)
 #define _ST_ZOMBIEQ                     (_st_this_vp.zombie_q)
 
+#ifdef DEBUG
+#define _ST_THREADQ                     (_st_this_vp.thread_q)
+#endif
+
 
 /*****************************************
  * vp queues operations
@@ -272,6 +282,11 @@ extern st_thread_t  *_st_this_thread;
 #define _ST_ADD_ZOMBIEQ(_thr)  ST_APPEND_LINK(&(_thr)->links, &_ST_ZOMBIEQ)
 #define _ST_DEL_ZOMBIEQ(_thr)  ST_REMOVE_LINK(&(_thr)->links)
 
+#ifdef DEBUG
+#define _ST_ADD_THREADQ(_thr)  ST_APPEND_LINK(&(_thr)->tlink, &_ST_THREADQ)
+#define _ST_DEL_THREADQ(_thr)  ST_REMOVE_LINK(&(_thr)->tlink)
+#endif
+
 
 /*****************************************
  * Thread states and flags
@@ -284,6 +299,7 @@ extern st_thread_t  *_st_this_thread;
 #define _ST_ST_COND_WAIT    4
 #define _ST_ST_SLEEPING     5
 #define _ST_ST_ZOMBIE       6
+#define _ST_ST_SUSPENDED    7
 
 #define _ST_FL_PRIMORDIAL   0x01
 #define _ST_FL_IDLE_THREAD  0x02
@@ -300,17 +316,22 @@ extern st_thread_t  *_st_this_thread;
 #define offsetof(type, identifier) ((size_t)&(((type *)0)->identifier))
 #endif
 
-#define _ST_THREAD_PTR(_qp)       \
+#define _ST_THREAD_PTR(_qp)         \
     ((st_thread_t *)((char *)(_qp) - offsetof(st_thread_t, links)))
 
-#define _ST_THREAD_WAITQ_PTR(_qp) \
+#define _ST_THREAD_WAITQ_PTR(_qp)   \
     ((st_thread_t *)((char *)(_qp) - offsetof(st_thread_t, wait_links)))
 
-#define _ST_THREAD_STACK_PTR(_qp) \
+#define _ST_THREAD_STACK_PTR(_qp)   \
     ((st_stack_t *)((char*)(_qp) - offsetof(st_stack_t, links)))
 
-#define _ST_POLLQUEUE_PTR(_qp)    \
+#define _ST_POLLQUEUE_PTR(_qp)      \
     ((st_pollq_t *)((char *)(_qp) - offsetof(st_pollq_t, links)))
+
+#ifdef DEBUG
+#define _ST_THREAD_THREADQ_PTR(_qp) \
+    ((st_thread_t *)((char *)(_qp) - offsetof(st_thread_t, tlink)))
+#endif
 
 
 /*****************************************
@@ -331,6 +352,13 @@ extern st_thread_t  *_st_this_thread;
  * Threads context switching
  */
 
+#ifdef DEBUG
+void _st_iterate_threads(void);
+#define ST_DEBUG_ITERATE_THREADS() _st_iterate_threads()
+#else
+#define ST_DEBUG_ITERATE_THREADS()
+#endif
+
 /*
  * Switch away from the current thread context by saving its state and
  * calling the thread scheduler
@@ -340,6 +368,7 @@ extern st_thread_t  *_st_this_thread;
     if (!MD_SETJMP((_thread)->context)) { \
       _st_vp_schedule();                  \
     }                                     \
+    ST_DEBUG_ITERATE_THREADS();           \
     ST_END_MACRO
 
 /*

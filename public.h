@@ -114,8 +114,12 @@ extern ssize_t st_read(st_netfd_t fd, void *buf, size_t nbyte,
 		       st_utime_t timeout);
 extern ssize_t st_read_fully(st_netfd_t fd, void *buf, size_t nbyte,
 			     st_utime_t timeout);
+extern int st_read_resid(st_netfd_t fd, void *buf, size_t *resid,
+			 st_utime_t timeout);
 extern ssize_t st_write(st_netfd_t fd, const void *buf, size_t nbyte,
 			st_utime_t timeout);
+extern int st_write_resid(st_netfd_t fd, const void *buf, size_t *resid,
+			  st_utime_t timeout);
 extern ssize_t st_writev(st_netfd_t fd, const struct iovec *iov, int iov_size,
 			 st_utime_t timeout);
 extern int st_recvfrom(st_netfd_t fd, void *buf, int len,

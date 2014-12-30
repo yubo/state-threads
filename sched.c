@@ -185,6 +185,9 @@ int st_init(void)
   ST_INIT_CLIST(&_ST_IOQ);
   ST_INIT_CLIST(&_ST_SLEEPQ);
   ST_INIT_CLIST(&_ST_ZOMBIEQ);
+#ifdef DEBUG
+  ST_INIT_CLIST(&_ST_THREADQ);
+#endif
 
 #ifndef USE_POLL
   _st_this_vp.maxfd = -1;
@@ -222,6 +225,9 @@ int st_init(void)
   thread->flags = _ST_FL_PRIMORDIAL;
   _ST_SET_CURRENT_THREAD(thread);
   _st_active_count++;
+#ifdef DEBUG
+  _ST_ADD_THREADQ(thread);
+#endif
 
   return 0;
 }
@@ -457,10 +463,10 @@ void _st_vp_idle(void)
   ST_ASSERT(_ST_OSFD_CNT >= 0);
   if (_ST_OSFD_CNT > _ST_POLLFDS_SIZE) {
     free(_ST_POLLFDS);
-    _ST_POLLFDS = (struct pollfd *) malloc(_ST_OSFD_CNT *
+    _ST_POLLFDS = (struct pollfd *) malloc((_ST_OSFD_CNT + 10) *
 					   sizeof(struct pollfd));
     ST_ASSERT(_ST_POLLFDS != NULL);
-    _ST_POLLFDS_SIZE = _ST_OSFD_CNT;
+    _ST_POLLFDS_SIZE = _ST_OSFD_CNT + 10;
   }
   pollfds = _ST_POLLFDS;
 
@@ -534,6 +540,10 @@ void st_thread_exit(void *retval)
     st_cond_destroy(thread->term);
     thread->term = NULL;
   }
+
+#ifdef DEBUG
+  _ST_DEL_THREADQ(thread);
+#endif
 
   if (!(thread->flags & _ST_FL_PRIMORDIAL))
     _st_stack_free(thread->stack);
@@ -609,9 +619,6 @@ void _st_add_sleep_q(st_thread_t *thread, st_utime_t timeout)
   st_clist_t *q;
   st_thread_t *t;
 
-  /* sort onto global sleep queue */
-  sleep = timeout;
-
   /* Check if we are longest timeout */
   if (timeout >= _ST_SLEEPQMAX) {
     ST_APPEND_LINK(&thread->links, &_ST_SLEEPQ);
@@ -619,26 +626,27 @@ void _st_add_sleep_q(st_thread_t *thread, st_utime_t timeout)
     _ST_SLEEPQMAX = timeout;
   } else {
     /* Sort thread into global sleep queue at appropriate point */
-    q = _ST_SLEEPQ.next;
+    sleep = _ST_SLEEPQMAX;
+    q = _ST_SLEEPQ.prev;
 
-    /* Now scan the list for where to insert this entry */
+    /* Now scan the list backward for where to insert this entry */
     while (q != &_ST_SLEEPQ) {
       t = _ST_THREAD_PTR(q);
-      if (sleep < t->sleep) {
+      sleep -= t->sleep;
+      if (timeout >= sleep) {
 	/* Found sleeper to insert in front of */
 	break;
       }
-      sleep -= t->sleep;
-      q = q->next;
+      q = q->prev;
     }
-    thread->sleep = sleep;
+    thread->sleep = timeout - sleep;
     ST_INSERT_BEFORE(&thread->links, q);
 
     /* Subtract our sleep time from the sleeper that follows us */
     ST_ASSERT(thread->links.next != &_ST_SLEEPQ);
     t = _ST_THREAD_PTR(thread->links.next);
     ST_ASSERT(_ST_THREAD_PTR(t->links.prev) == thread);
-    t->sleep -= sleep;
+    t->sleep -= thread->sleep;
   }
 
   thread->flags |= _ST_FL_ON_SLEEPQ;
@@ -826,6 +834,9 @@ st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
   thread->state = _ST_ST_RUNNABLE;
   _st_active_count++;
   _ST_ADD_RUNQ(thread);
+#ifdef DEBUG
+  _ST_ADD_THREADQ(thread);
+#endif
 
   return thread;
 }
@@ -835,4 +846,55 @@ st_thread_t *st_thread_self(void)
 {
   return _ST_CURRENT_THREAD();
 }
+
+
+#ifdef DEBUG
+/* ARGSUSED */
+void _st_show_thread_stack(st_thread_t *thread, const char *messg)
+{
+
+}
+
+/* To be set from debugger */
+int _st_iterate_threads_flag = 0;
+
+void _st_iterate_threads(void)
+{
+  static st_thread_t *thread = NULL;
+  static jmp_buf orig_jb, save_jb;
+  st_clist_t *q;
+
+  if (!_st_iterate_threads_flag) {
+    if (thread) {
+      memcpy(thread->context, save_jb, sizeof(jmp_buf));
+      MD_LONGJMP(orig_jb, 1);
+    }
+    return;
+  }
+
+  if (thread) {
+    memcpy(thread->context, save_jb, sizeof(jmp_buf));
+    _st_show_thread_stack(thread, NULL);
+  } else {
+    if (MD_SETJMP(orig_jb)) {
+      _st_iterate_threads_flag = 0;
+      thread = NULL;
+      _st_show_thread_stack(thread, "Iteration completed");
+      return;
+    }
+    thread = _ST_CURRENT_THREAD();
+    _st_show_thread_stack(thread, "Iteration started");
+  }
+
+  q = thread->tlink.next;
+  if (q == &_ST_THREADQ)
+    q = q->next;
+  ST_ASSERT(q != &_ST_THREADQ);
+  thread = _ST_THREAD_THREADQ_PTR(q);
+  if (thread == _ST_CURRENT_THREAD())
+    MD_LONGJMP(orig_jb, 1);
+  memcpy(save_jb, thread->context, sizeof(jmp_buf));
+  MD_LONGJMP(thread->context, 1);
+}
+#endif /* DEBUG */
 

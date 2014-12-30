@@ -12,6 +12,7 @@
 <LI><A HREF=#intra>Intra-Process Synchronization</A></LI>
 <LI><A HREF=#inter>Inter-Process Synchronization</A></LI>
 <LI><A HREF=#disk>Disk I/O</A></LI>
+<LI><A HREF=#timeouts>Timeouts</A></LI>
 </UL>
 </B>
 <P>
@@ -352,6 +353,47 @@ drawback:
     operation.  Once the operation completes, the helper returns a
     notification via IPC.
 </UL>
+<P>
+
+<A NAME="timeouts">
+<H3>Timeouts</H3>
+
+The <TT>timeout</TT> parameter to <TT>st_cond_timedwait()</TT> and the
+I/O functions, and the arguments to <TT>st_sleep()</TT> and
+<TT>st_usleep()</TT> specify a maximum time to wait <I>since the last
+context switch</I> not since the beginning of the function call.
+
+<P>The State Threads' time resolution is actually the time interval
+between context switches.  That time interval may be large in some
+situations, for example, when a single thread does a lot of work
+continuously.  Note that a steady, uninterrupted stream of network I/O
+qualifies for this description; a context switch occurs only when a
+thread blocks.
+
+<P>If a specified I/O timeout is less than the time interval between
+context switches the function may return with a timeout error before
+that amount of time has elapsed since the beginning of the function
+call.  For example, if eight milliseconds have passed since the last
+context switch and an I/O function with a timeout of 10 milliseconds
+blocks, causing a switch, the call may return with a timeout error as
+little as two milliseconds after it was called.  (On Linux,
+<TT>select()</TT>'s timeout is an <I>upper</I> bound on the amount of
+time elapsed before select returns.)  Similarly, if 12 ms have passed
+already, the function may return immediately.
+
+<P>In almost all cases I/O timeouts should be used only for detecting a
+broken network connection or for preventing a peer from holding an idle
+connection for too long.  Therefore for most applications realistic I/O
+timeouts should be on the order of seconds.  Furthermore, there's
+probably no point in retrying operations that time out.  Rather than
+retrying simply use a larger timeout in the first place.
+
+<P>The largest valid timeout value is platform-dependent and may be
+significantly less than <TT>INT_MAX</TT> seconds for <TT>select()</TT>
+or <TT>INT_MAX</TT> milliseconds for <TT>poll()</TT>.  Generally, you
+should not use timeouts exceeding several hours.  Use -1 as a special
+value to indicate infinite timeout or indefinite sleep.
+
 <P>
 <HR>
 <P>

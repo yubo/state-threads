@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+ * Portions created by SGI are Copyright (C) 2000 Silicon Graphics, Inc.
+ * All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

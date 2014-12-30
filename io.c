@@ -398,6 +398,14 @@ int st_connect(st_netfd_t *fd, struct sockaddr *addr, int addrlen,
 
   while (connect(fd->osfd, addr, addrlen) < 0) {
     if (errno != EINTR) {
+      /*
+       * On some platforms, if connect() is interrupted (errno == EINTR)
+       * after the kernel binds the socket, a subsequent connect()
+       * attempt will fail with errno == EADDRINUSE.  Ignore EADDRINUSE
+       * iff connect() was previously interrupted.  See Rich Stevens'
+       * "UNIX Network Programming," Vol. 1, 2nd edition, p. 413
+       * ("Interrupted connect").
+       */
       if (errno != EINPROGRESS && (errno != EADDRINUSE || err == 0))
 	return -1;
       /* Wait until the socket becomes writable */
@@ -439,21 +447,19 @@ ssize_t st_read(st_netfd_t *fd, void *buf, size_t nbyte, st_utime_t timeout)
 }
 
 
-ssize_t st_read_fully(st_netfd_t *fd, void *buf, size_t nbyte,
-		      st_utime_t timeout)
+int st_read_resid(st_netfd_t *fd, void *buf, size_t *resid, st_utime_t timeout)
 {
   ssize_t n;
-  size_t nleft = nbyte;
 
-  while (nleft > 0) {
-    if ((n = read(fd->osfd, buf, nleft)) < 0) {
+  while (*resid > 0) {
+    if ((n = read(fd->osfd, buf, *resid)) < 0) {
       if (errno == EINTR)
 	continue;
       if (!_IO_NOT_READY_ERROR)
 	return -1;
     } else {
-      nleft -= n;
-      if (nleft == 0 || n == 0)
+      *resid -= n;
+      if (*resid == 0 || n == 0)
 	break;
       buf = (void *)((char *)buf + n);
     }
@@ -462,26 +468,34 @@ ssize_t st_read_fully(st_netfd_t *fd, void *buf, size_t nbyte,
       return -1;
   }
 
-  return (ssize_t)(nbyte - nleft);
+  return 0;
 }
 
 
-ssize_t st_write(st_netfd_t *fd, const void *buf, size_t nbyte,
-		 st_utime_t timeout)
+ssize_t st_read_fully(st_netfd_t *fd, void *buf, size_t nbyte,
+		      st_utime_t timeout)
+{
+  size_t resid = nbyte;
+  return st_read_resid(fd, buf, &resid, timeout) == 0 ?
+    (ssize_t) (nbyte - resid) : -1;
+}
+
+
+int st_write_resid(st_netfd_t *fd, const void *buf, size_t *resid,
+		   st_utime_t timeout)
 {
   ssize_t n;
-  size_t nleft = nbyte;
 
-  while (nleft > 0) {
-    if ((n = write(fd->osfd, buf, nleft)) < 0) {
+  while (*resid > 0) {
+    if ((n = write(fd->osfd, buf, *resid)) < 0) {
       if (errno == EINTR)
 	continue;
       if (!_IO_NOT_READY_ERROR)
 	return -1;
     } else {
-      if (n == nleft)
+      *resid -= n;
+      if (*resid == 0)
 	break;
-      nleft -= n;
       buf = (const void *)((const char *)buf + n);
     }
     /* Wait until the socket becomes writable */
@@ -489,7 +503,16 @@ ssize_t st_write(st_netfd_t *fd, const void *buf, size_t nbyte,
       return -1;
   }
 
-  return (ssize_t)nbyte;
+  return 0;
+}
+
+
+ssize_t st_write(st_netfd_t *fd, const void *buf, size_t nbyte,
+		 st_utime_t timeout)
+{
+  size_t resid = nbyte;
+  return st_write_resid(fd, buf, &resid, timeout) == 0 ?
+    (ssize_t) (nbyte - resid) : -1;
 }
 
 

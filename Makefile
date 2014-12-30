@@ -32,6 +32,9 @@
 # may use your version of this file under either the MPL or the
 # GPL.
 
+# This is the full version of the libst library - modify carefully
+VERSION     = 1.3
+
 ##########################
 # Supported OSes:
 #
@@ -55,6 +58,7 @@ CC          = cc
 AR          = ar
 LD          = ld
 RANLIB      = ranlib
+LN          = ln
 
 SHELL       = /bin/sh
 ECHO        = /bin/echo
@@ -64,7 +68,9 @@ TARGETDIR   = $(OS)_$(shell uname -r)_$(BUILD)
 
 DEFINES     = -D$(OS)
 CFLAGS      =
+SFLAGS      =
 ARFLAGS     = -rv
+LNFLAGS     = -s
 DSO_SUFFIX  = so
 
 
@@ -102,8 +108,8 @@ endif
 endif
 
 ifeq ($(OS), FREEBSD)
-CFLAGS      = -fPIC
-LDFLAGS     = -shared
+SFLAGS      = -fPIC
+LDFLAGS     = -shared -soname=$(SONAME) -lc
 OTHER_FLAGS = -Wall
 endif
 
@@ -137,13 +143,14 @@ ifeq ($(OS), LINUX_IA64)
 DEFINES     = -DLINUX
 EXTRA_OBJS  = $(TARGETDIR)/ia64asm.o
 endif
-LDFLAGS     = -shared
+SFLAGS      = -fPIC
+LDFLAGS     = -shared -soname=$(SONAME) -lc
 OTHER_FLAGS = -Wall
 endif
 
 ifeq ($(OS), OPENBSD)
-CFLAGS      = -fPIC
-LDFLAGS     = -shared
+SFLAGS      = -fPIC
+LDFLAGS     = -shared -soname=$(SONAME) -lc
 OTHER_FLAGS = -Wall
 endif
 
@@ -177,6 +184,15 @@ endif
 # Other possible defines:
 # To use poll(2) instead of select(2) for events checking:
 # DEFINES += -DUSE_POLL
+# You may prefer to use select for applications that have many threads
+# using one file descriptor, and poll for applications that have many
+# different file descriptors.  With USE_POLL poll() is called with at
+# least one pollfd per I/O-blocked thread, so 1000 threads sharing one
+# descriptor will poll 1000 identical pollfds and select would be more
+# efficient.  But if the threads all use different descriptors poll()
+# may be better depending on your operating system's implementation of
+# poll and select.  Really, it's up to you.  Oh, and on some platforms
+# poll() fails with more than a few dozen descriptors.
 #
 # Some platforms allow to define FD_SETSIZE (if select() is used), e.g.:
 # DEFINES += -DFD_SETSIZE=4096
@@ -195,8 +211,14 @@ OBJS        = $(TARGETDIR)/sched.o \
 OBJS        += $(EXTRA_OBJS)
 HEADER      = $(TARGETDIR)/st.h
 SLIBRARY    = $(TARGETDIR)/libst.a
-DLIBRARY    = $(TARGETDIR)/libst.$(DSO_SUFFIX)
+DLIBRARY    = $(TARGETDIR)/libst.$(DSO_SUFFIX).$(VERSION)
 EXAMPLES    = examples
+
+MAJOR       = $(shell echo $(VERSION) | sed 's/^\([^\.]*\).*/\1/')
+LINKNAME    = libst.$(DSO_SUFFIX)
+SONAME      = libst.$(DSO_SUFFIX).$(MAJOR)
+FULLNAME    = libst.$(DSO_SUFFIX).$(VERSION)
+DESC        = st.pc
 
 ifeq ($(STATIC_ONLY), yes)
 LIBRARIES   = $(SLIBRARY)
@@ -207,7 +229,7 @@ endif
 ifeq ($(OS),)
 ST_ALL      = unknown
 else
-ST_ALL      = $(TARGETDIR) $(LIBRARIES) $(HEADER) $(EXAMPLES)
+ST_ALL      = $(TARGETDIR) $(LIBRARIES) $(HEADER) $(EXAMPLES) $(DESC)
 endif
 
 all: $(ST_ALL)
@@ -219,15 +241,21 @@ unknown:
 	@for target in $(TARGETS); do echo $$target; done
 	@echo
 
+st.pc:	st.pc.in
+	sed "s/@VERSION@/${VERSION}/g" < $< > $@
+
 $(TARGETDIR):
 	if [ ! -d $(TARGETDIR) ]; then mkdir $(TARGETDIR); fi
 
 $(SLIBRARY): $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)
 	$(RANLIB) $@
+	rm -f obj; $(LN) $(LNFLAGS) $(TARGETDIR) obj
 
-$(DLIBRARY): $(OBJS)
-	$(LD) $(LDFLAGS) $(OBJS) -o $@
+$(DLIBRARY): $(OBJS:%.o=%-pic.o)
+	$(LD) $(LDFLAGS) $^ -o $@
+	cd $(TARGETDIR); rm -f $(SONAME); $(LN) $(LNFLAGS) $(FULLNAME) $(SONAME)
+	cd $(TARGETDIR); rm -f $(LINKNAME); $(LN) $(LNFLAGS) $(FULLNAME) $(LINKNAME)
 
 $(HEADER): public.h
 	rm -f $@
@@ -243,10 +271,28 @@ examples::
 	@cd $@; $(MAKE) CC="$(CC)" CFLAGS="$(CFLAGS)" OS="$(OS)" TARGETDIR="$(TARGETDIR)"
 
 clean:
-	rm -rf *_OPT *_DBG
+	rm -rf *_OPT *_DBG obj st.pc
+
+##########################
+# Pattern rules:
+
+ifneq ($(SFLAGS),)
+# Compile with shared library options if it's a C file
+$(TARGETDIR)/%-pic.o: %.c
+	$(CC) $(CFLAGS) $(SFLAGS) -c $< -o $@
+endif
+
+# Compile assembly as normal or C as normal if no SFLAGS
+%-pic.o: %.o
+	rm -f $@; $(LN) $(LNFLAGS) $(<F) $@
 
 ##########################
 # Target rules:
+
+default-debug:
+	. ./osguess.sh; $(MAKE) OS="$$OS" BUILD="DBG"
+default default-optimized:
+	. ./osguess.sh; $(MAKE) OS="$$OS" BUILD="OPT"
 
 aix-debug:
 	$(MAKE) OS="AIX" BUILD="DBG"
