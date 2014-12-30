@@ -33,13 +33,14 @@
 # GPL.
 
 # This is the full version of the libst library - modify carefully
-VERSION     = 1.8
+VERSION     = 1.9
 
 ##########################
 # Supported OSes:
 #
 #OS         = AIX
 #OS         = CYGWIN
+#OS         = DARWIN
 #OS         = FREEBSD
 #OS         = HPUX
 #OS         = HPUX_64
@@ -130,7 +131,18 @@ ifeq ($(OS), DARWIN)
 LD          = cc
 SFLAGS      = -fPIC -fno-common
 DSO_SUFFIX  = dylib
-LDFLAGS     = -dynamiclib -install_name /sw/lib/libst.$(MAJOR).$(DSO_SUFFIX) -compatibility_version $(MAJOR) -current_version $(VERSION)
+RELEASE     = $(shell uname -r | cut -d. -f1)
+PPC         = $(shell test $(RELEASE) -le 9 && echo yes)
+INTEL       = $(shell test $(RELEASE) -ge 9 && echo yes)
+ifeq ($(PPC), yes)
+CFLAGS      += -arch ppc
+LDFLAGS     += -arch ppc
+endif
+ifeq ($(INTEL), yes)
+CFLAGS      += -arch i386 -arch x86_64
+LDFLAGS     += -arch i386 -arch x86_64
+endif
+LDFLAGS     += -dynamiclib -install_name /sw/lib/libst.$(MAJOR).$(DSO_SUFFIX) -compatibility_version $(MAJOR) -current_version $(VERSION)
 OTHER_FLAGS = -Wall
 endif
 
@@ -356,6 +368,7 @@ $(TARGETDIR)/%.o: %.c common.h md.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 examples::
+	@echo Making $@
 	@cd $@; $(MAKE) CC="$(CC)" CFLAGS="$(CFLAGS)" OS="$(OS)" TARGETDIR="$(TARGETDIR)"
 
 clean:

@@ -58,6 +58,12 @@
 #define ST_BEGIN_MACRO  {
 #define ST_END_MACRO    }
 
+#ifdef DEBUG
+#define ST_HIDDEN   /*nothing*/
+#else
+#define	ST_HIDDEN   static
+#endif
+
 #include "public.h"
 #include "md.h"
 
@@ -343,7 +349,7 @@ extern _st_eventsys_t *_st_eventsys;
  */
 
 #ifndef ST_UTIME_NO_TIMEOUT
-#define ST_UTIME_NO_TIMEOUT (-1ULL)
+#define ST_UTIME_NO_TIMEOUT ((st_utime_t) -1LL)
 #endif
 
 #ifndef __ia64__

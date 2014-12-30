@@ -157,7 +157,7 @@ _st_eventsys_t *_st_eventsys = NULL;
  * select event system
  */
 
-int _st_select_init(void)
+ST_HIDDEN int _st_select_init(void)
 {
     _st_select_data = (struct _st_seldata *) malloc(sizeof(*_st_select_data));
     if (!_st_select_data)
@@ -169,7 +169,7 @@ int _st_select_init(void)
     return 0;
 }
 
-int _st_select_pollset_add(struct pollfd *pds, int npds)
+ST_HIDDEN int _st_select_pollset_add(struct pollfd *pds, int npds)
 {
     struct pollfd *pd;
     struct pollfd *epd = pds + npds;
@@ -203,7 +203,7 @@ int _st_select_pollset_add(struct pollfd *pds, int npds)
     return 0;
 }
 
-void _st_select_pollset_del(struct pollfd *pds, int npds)
+ST_HIDDEN void _st_select_pollset_del(struct pollfd *pds, int npds)
 {
     struct pollfd *pd;
     struct pollfd *epd = pds + npds;
@@ -224,7 +224,7 @@ void _st_select_pollset_del(struct pollfd *pds, int npds)
     }
 }
 
-void _st_select_find_bad_fd(void)
+ST_HIDDEN void _st_select_find_bad_fd(void)
 {
     _st_clist_t *q;
     _st_pollq_t *pq;
@@ -293,7 +293,7 @@ void _st_select_find_bad_fd(void)
     }
 }
 
-void _st_select_dispatch(void)
+ST_HIDDEN void _st_select_dispatch(void)
 {
     struct timeval timeout, *tvp;
     fd_set r, w, e;
@@ -406,7 +406,7 @@ void _st_select_dispatch(void)
     }
 }
 
-int _st_select_fd_new(int osfd)
+ST_HIDDEN int _st_select_fd_new(int osfd)
 {
     if (osfd >= FD_SETSIZE) {
         errno = EMFILE;
@@ -416,7 +416,7 @@ int _st_select_fd_new(int osfd)
     return 0;
 }
 
-int _st_select_fd_close(int osfd)
+ST_HIDDEN int _st_select_fd_close(int osfd)
 {
     if (_ST_SELECT_READ_CNT(osfd) || _ST_SELECT_WRITE_CNT(osfd) ||
         _ST_SELECT_EXCEP_CNT(osfd)) {
@@ -427,7 +427,7 @@ int _st_select_fd_close(int osfd)
     return 0;
 }
 
-int _st_select_fd_getlimit(void)
+ST_HIDDEN int _st_select_fd_getlimit(void)
 {
     return FD_SETSIZE;
 }
@@ -450,7 +450,7 @@ static _st_eventsys_t _st_select_eventsys = {
  * poll event system
  */
 
-int _st_poll_init(void)
+ST_HIDDEN int _st_poll_init(void)
 {
     _st_poll_data = (struct _st_polldata *) malloc(sizeof(*_st_poll_data));
     if (!_st_poll_data)
@@ -469,7 +469,7 @@ int _st_poll_init(void)
     return 0;
 }
 
-int _st_poll_pollset_add(struct pollfd *pds, int npds)
+ST_HIDDEN int _st_poll_pollset_add(struct pollfd *pds, int npds)
 {
     struct pollfd *pd;
     struct pollfd *epd = pds + npds;
@@ -486,13 +486,14 @@ int _st_poll_pollset_add(struct pollfd *pds, int npds)
     return 0;
 }
 
-void _st_poll_pollset_del(struct pollfd *pds, int npds)
+/* ARGSUSED */
+ST_HIDDEN void _st_poll_pollset_del(struct pollfd *pds, int npds)
 {
     _ST_POLL_OSFD_CNT -= npds;
     ST_ASSERT(_ST_POLL_OSFD_CNT >= 0);
 }
 
-void _st_poll_dispatch(void)
+ST_HIDDEN void _st_poll_dispatch(void)
 {
     int timeout, nfd;
     _st_clist_t *q;
@@ -561,12 +562,14 @@ void _st_poll_dispatch(void)
     }
 }
 
-int _st_poll_fd_new(int osfd)
+/* ARGSUSED */
+ST_HIDDEN int _st_poll_fd_new(int osfd)
 {
     return 0;
 }
 
-int _st_poll_fd_close(int osfd)
+/* ARGSUSED */
+ST_HIDDEN int _st_poll_fd_close(int osfd)
 {
     /*
      * We don't maintain I/O counts for poll event system
@@ -575,7 +578,7 @@ int _st_poll_fd_close(int osfd)
     return 0;
 }
 
-int _st_poll_fd_getlimit(void)
+ST_HIDDEN int _st_poll_fd_getlimit(void)
 {
     /* zero means no specific limit */
     return 0;
@@ -600,7 +603,7 @@ static _st_eventsys_t _st_poll_eventsys = {
  * kqueue event system
  */
                     
-int _st_kq_init(void)
+ST_HIDDEN int _st_kq_init(void)
 {
     int err = 0;
     int rv = 0;
@@ -662,7 +665,7 @@ int _st_kq_init(void)
     return rv;
 }
 
-int _st_kq_fd_data_expand(int maxfd)
+ST_HIDDEN int _st_kq_fd_data_expand(int maxfd)
 {
     _kq_fd_data_t *ptr;
     int n = _st_kq_data->fd_data_size;
@@ -684,7 +687,7 @@ int _st_kq_fd_data_expand(int maxfd)
     return 0;
 }
 
-int _st_kq_addlist_expand(int avail)
+ST_HIDDEN int _st_kq_addlist_expand(int avail)
 {
     struct kevent *ptr;
     int n = _st_kq_data->addlist_size;
@@ -714,7 +717,7 @@ int _st_kq_addlist_expand(int avail)
     return 0;
 }
 
-void _st_kq_addlist_add(const struct kevent *kev)
+ST_HIDDEN void _st_kq_addlist_add(const struct kevent *kev)
 {
     ST_ASSERT(_st_kq_data->addlist_cnt < _st_kq_data->addlist_size);
     memcpy(_st_kq_data->addlist + _st_kq_data->addlist_cnt, kev,
@@ -722,7 +725,7 @@ void _st_kq_addlist_add(const struct kevent *kev)
     _st_kq_data->addlist_cnt++;
 }
 
-void _st_kq_dellist_add(const struct kevent *kev)
+ST_HIDDEN void _st_kq_dellist_add(const struct kevent *kev)
 {
     int n = _st_kq_data->dellist_size;
 
@@ -746,7 +749,7 @@ void _st_kq_dellist_add(const struct kevent *kev)
     _st_kq_data->dellist_cnt++;
 }
 
-int _st_kq_pollset_add(struct pollfd *pds, int npds)
+ST_HIDDEN int _st_kq_pollset_add(struct pollfd *pds, int npds)
 {
     struct kevent kev;
     struct pollfd *pd;
@@ -802,7 +805,7 @@ int _st_kq_pollset_add(struct pollfd *pds, int npds)
     return 0;
 }
 
-void _st_kq_pollset_del(struct pollfd *pds, int npds)
+ST_HIDDEN void _st_kq_pollset_del(struct pollfd *pds, int npds)
 {
     struct kevent kev;
     struct pollfd *pd;
@@ -844,7 +847,7 @@ void _st_kq_pollset_del(struct pollfd *pds, int npds)
     }
 }
 
-void _st_kq_dispatch(void)
+ST_HIDDEN void _st_kq_dispatch(void)
 {
     struct timespec timeout, *tsp;
     struct kevent kev;
@@ -984,7 +987,7 @@ void _st_kq_dispatch(void)
     }
 }
 
-int _st_kq_fd_new(int osfd)
+ST_HIDDEN int _st_kq_fd_new(int osfd)
 {
     if (osfd >= _st_kq_data->fd_data_size && _st_kq_fd_data_expand(osfd) < 0)
         return -1;
@@ -992,7 +995,7 @@ int _st_kq_fd_new(int osfd)
     return 0;
 }
 
-int _st_kq_fd_close(int osfd)
+ST_HIDDEN int _st_kq_fd_close(int osfd)
 {
     if (_ST_KQ_READ_CNT(osfd) || _ST_KQ_WRITE_CNT(osfd)) {
         errno = EBUSY;
@@ -1002,7 +1005,7 @@ int _st_kq_fd_close(int osfd)
     return 0;
 }
 
-int _st_kq_fd_getlimit(void)
+ST_HIDDEN int _st_kq_fd_getlimit(void)
 {
     /* zero means no specific limit */
     return 0;
@@ -1027,7 +1030,7 @@ static _st_eventsys_t _st_kq_eventsys = {
  * epoll event system
  */
 
-int _st_epoll_init(void)
+ST_HIDDEN int _st_epoll_init(void)
 {
     int fdlim;
     int err = 0;
@@ -1085,7 +1088,7 @@ int _st_epoll_init(void)
     return rv;
 }
 
-int _st_epoll_fd_data_expand(int maxfd)
+ST_HIDDEN int _st_epoll_fd_data_expand(int maxfd)
 {
     _epoll_fd_data_t *ptr;
     int n = _st_epoll_data->fd_data_size;
@@ -1107,7 +1110,7 @@ int _st_epoll_fd_data_expand(int maxfd)
     return 0;
 }
 
-void _st_epoll_evtlist_expand(void)
+ST_HIDDEN void _st_epoll_evtlist_expand(void)
 {
     struct epoll_event *ptr;
     int n = _st_epoll_data->evtlist_size;
@@ -1123,7 +1126,7 @@ void _st_epoll_evtlist_expand(void)
     }
 }
 
-void _st_epoll_pollset_del(struct pollfd *pds, int npds)
+ST_HIDDEN void _st_epoll_pollset_del(struct pollfd *pds, int npds)
 {
     struct epoll_event ev;
     struct pollfd *pd;
@@ -1163,7 +1166,7 @@ void _st_epoll_pollset_del(struct pollfd *pds, int npds)
     }
 }
 
-int _st_epoll_pollset_add(struct pollfd *pds, int npds)
+ST_HIDDEN int _st_epoll_pollset_add(struct pollfd *pds, int npds)
 {
     struct epoll_event ev;
     int i, fd;
@@ -1221,7 +1224,7 @@ int _st_epoll_pollset_add(struct pollfd *pds, int npds)
     return 0;
 }
 
-void _st_epoll_dispatch(void)
+ST_HIDDEN void _st_epoll_dispatch(void)
 {
     st_utime_t min_timeout;
     _st_clist_t *q;
@@ -1336,7 +1339,7 @@ void _st_epoll_dispatch(void)
     }
 }
 
-int _st_epoll_fd_new(int osfd)
+ST_HIDDEN int _st_epoll_fd_new(int osfd)
 {
     if (osfd >= _st_epoll_data->fd_data_size &&
         _st_epoll_fd_data_expand(osfd) < 0)
@@ -1345,7 +1348,7 @@ int _st_epoll_fd_new(int osfd)
     return 0;   
 }
 
-int _st_epoll_fd_close(int osfd)
+ST_HIDDEN int _st_epoll_fd_close(int osfd)
 {
     if (_ST_EPOLL_READ_CNT(osfd) || _ST_EPOLL_WRITE_CNT(osfd) ||
         _ST_EPOLL_EXCEP_CNT(osfd)) {
@@ -1356,7 +1359,7 @@ int _st_epoll_fd_close(int osfd)
     return 0;
 }
 
-int _st_epoll_fd_getlimit(void)
+ST_HIDDEN int _st_epoll_fd_getlimit(void)
 {
     /* zero means no specific limit */
     return 0;
@@ -1365,7 +1368,7 @@ int _st_epoll_fd_getlimit(void)
 /*
  * Check if epoll functions are just stubs.
  */
-int _st_epoll_is_supported(void)
+ST_HIDDEN int _st_epoll_is_supported(void)
 {
     struct epoll_event ev;
 

@@ -82,7 +82,7 @@
 #endif
 
 /* New in Solaris 7 */
-#ifdef ns_get16
+#if !defined(_getshort) && defined(ns_get16)
 #define _getshort(cp) ns_get16(cp)
 #endif
 

@@ -84,7 +84,7 @@
 struct socket_info {
   st_netfd_t nfd;               /* Listening socket                     */
   char *addr;                   /* Bind address                         */
-  int port;                     /* Port                                 */
+  unsigned int port;            /* Port                                 */
   int wait_threads;             /* Number of threads waiting to accept  */
   int busy_threads;             /* Number of threads processing request */
   int rqst_count;               /* Total number of processed requests   */
@@ -446,13 +446,13 @@ static void create_listeners(void)
   char *c;
   struct sockaddr_in serv_addr;
   struct hostent *hp;
-  short port;
+  unsigned short port;
 
   for (i = 0; i < sk_count; i++) {
     port = 0;
     if ((c = strchr(srv_socket[i].addr, ':')) != NULL) {
       *c++ = '\0';
-      port = (short) atoi(c);
+      port = (unsigned short) atoi(c);
     }
     if (srv_socket[i].addr[0] == '\0')
       srv_socket[i].addr = "0.0.0.0";
@@ -480,7 +480,7 @@ static void create_listeners(void)
 
     /* Do bind and listen */
     if (bind(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-      err_sys_quit(errfd, "ERROR: can't bind to address %s, port %d",
+      err_sys_quit(errfd, "ERROR: can't bind to address %s, port %hu",
 		   srv_socket[i].addr, port);
     if (listen(sock, listenq_size) < 0)
       err_sys_quit(errfd, "ERROR: listen");
@@ -827,7 +827,7 @@ static void start_threads(void)
   /* Create connections handling threads */
   for (i = 0; i < sk_count; i++) {
     err_report(errfd, "INFO: process %d (pid %d): starting %d threads"
-	       " on %s:%d", my_index, my_pid, max_wait_threads,
+	       " on %s:%u", my_index, my_pid, max_wait_threads,
 	       srv_socket[i].addr, srv_socket[i].port);
     WAIT_THREADS(i) = 0;
     BUSY_THREADS(i) = 0;
@@ -906,7 +906,7 @@ static void dump_server_info(void)
   for (i = 0; i < sk_count; i++) {
     len += sprintf(buf + len, "\nListening Socket #%d:\n"
 		   "-------------------------\n"
-		   "Address                    %s:%d\n"
+		   "Address                    %s:%u\n"
 		   "Thread limits (min/max)    %d/%d\n"
 		   "Waiting threads            %d\n"
 		   "Busy threads               %d\n"

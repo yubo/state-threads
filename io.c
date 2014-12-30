@@ -86,7 +86,7 @@ int _st_io_init(void)
     return -1;
 
   fdlim = (*_st_eventsys->fd_getlimit)();
-  if (fdlim > 0 && rlim.rlim_max > fdlim) {
+  if (fdlim > 0 && rlim.rlim_max > (rlim_t) fdlim) {
     rlim.rlim_max = fdlim;
   }
   rlim.rlim_cur = rlim.rlim_max;
@@ -500,7 +500,7 @@ int st_readv_resid(_st_netfd_t *fd, struct iovec **iov, int *iov_size,
     } else if (n == 0)
       break;
     else {
-      while (n >= (*iov)->iov_len) {
+      while ((size_t) n >= (*iov)->iov_len) {
 	n -= (*iov)->iov_len;
 	(*iov)->iov_base = (char *) (*iov)->iov_base + (*iov)->iov_len;
 	(*iov)->iov_len = 0;
@@ -538,7 +538,7 @@ int st_write_resid(_st_netfd_t *fd, const void *buf, size_t *resid,
   struct iovec iov, *riov;
   int riov_size, rv;
 
-  iov.iov_base = (void *) buf;
+  iov.iov_base = (void *) buf;	    /* we promise not to modify buf */
   iov.iov_len = *resid;
   riov = &iov;
   riov_size = 1;
@@ -578,7 +578,7 @@ ssize_t st_writev(_st_netfd_t *fd, const struct iovec *iov, int iov_size,
 
   while (nleft > 0) {
     if (iov_cnt == 1) {
-      if (st_write(fd, tmp_iov[0].iov_base, nleft, timeout) != nleft)
+      if (st_write(fd, tmp_iov[0].iov_base, nleft, timeout) != (ssize_t) nleft)
 	rv = -1;
       break;
     }
@@ -590,12 +590,12 @@ ssize_t st_writev(_st_netfd_t *fd, const struct iovec *iov, int iov_size,
 	break;
       }
     } else {
-      if (n == nleft)
+      if ((size_t) n == nleft)
 	break;
       nleft -= n;
       /* Find the next unwritten vector */
       n = (ssize_t)(nbyte - nleft);
-      for (index = 0; n >= iov[index].iov_len; index++)
+      for (index = 0; (size_t) n >= iov[index].iov_len; index++)
 	n -= iov[index].iov_len;
 
       if (tmp_iov == iov) {
@@ -649,7 +649,7 @@ int st_writev_resid(_st_netfd_t *fd, struct iovec **iov, int *iov_size,
       if (!_IO_NOT_READY_ERROR)
 	return -1;
     } else {
-      while (n >= (*iov)->iov_len) {
+      while ((size_t) n >= (*iov)->iov_len) {
 	n -= (*iov)->iov_len;
 	(*iov)->iov_base = (char *) (*iov)->iov_base + (*iov)->iov_len;
 	(*iov)->iov_len = 0;

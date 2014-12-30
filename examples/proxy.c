@@ -228,7 +228,7 @@ static void read_address(const char *str, struct sockaddr_in *sin)
 {
   char host[128], *p;
   struct hostent *hp;
-  short port;
+  unsigned short port;
 
   strcpy(host, str);
   if ((p = strchr(host, ':')) == NULL) {
@@ -236,7 +236,7 @@ static void read_address(const char *str, struct sockaddr_in *sin)
     exit(1);
   }
   *p++ = '\0';
-  port = (short) atoi(p);
+  port = (unsigned short) atoi(p);
   if (port < 1) {
     fprintf(stderr, "%s: invalid port: %s\n", prog, p);
     exit(1);
@@ -269,11 +269,12 @@ static void show_iov(const struct iovec *iov, int niov)
   printf("iov %p has %d entries:\n", iov, niov);
   total = 0;
   for (i = 0; i < niov; i++) {
-    printf("iov[%3d] iov_base=%p iov_len=0x%x(%d)\n",
-     i, iov[i].iov_base, iov[i].iov_len, iov[i].iov_len);
+    printf("iov[%3d] iov_base=%p iov_len=0x%lx(%lu)\n",
+     i, iov[i].iov_base, (unsigned long) iov[i].iov_len,
+     (unsigned long) iov[i].iov_len);
     total += iov[i].iov_len;
   }
-  printf("total 0x%x(%d)\n", total, total);
+  printf("total 0x%lx(%ld)\n", (unsigned long) total, (unsigned long) total);
 }
 
 /*

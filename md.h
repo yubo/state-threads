@@ -125,6 +125,10 @@
 
 #if defined(__ppc__)
 #define MD_JB_SP  0
+#elif defined(__i386__)
+#define MD_JB_SP  9
+#elif defined(__x86_64__)
+#define MD_JB_SP  4
 #else
 #error Unknown CPU architecture
 #endif
@@ -133,7 +137,7 @@
   ST_BEGIN_MACRO                               \
   if (MD_SETJMP((_thread)->context))           \
     _main();                                   \
-  (_thread)->context[MD_JB_SP] = (long) (_sp); \
+  *((long *)&((_thread)->context[MD_JB_SP])) = (long) (_sp); \
   ST_END_MACRO
 
 #define MD_GET_UTIME()            \

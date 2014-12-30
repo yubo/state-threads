@@ -45,6 +45,10 @@
 #include <errno.h>
 #include <poll.h>
 
+#define ST_VERSION	    "1.9"
+#define ST_VERSION_MAJOR    1
+#define ST_VERSION_MINOR    9
+
 /* Undefine this to remove the context switch callback feature. */
 #define ST_SWITCH_CB
 
@@ -53,7 +57,7 @@
 #endif
 
 #ifndef ST_UTIME_NO_TIMEOUT
-#define ST_UTIME_NO_TIMEOUT (-1ULL)
+#define ST_UTIME_NO_TIMEOUT ((st_utime_t) -1LL)
 #endif
 
 #ifndef ST_UTIME_NO_WAIT
