@@ -50,16 +50,16 @@
 /* How much space to leave between the stacks, at each end */
 #define REDZONE	_ST_PAGE_SIZE
 
-st_clist_t _st_free_stacks = ST_INIT_STATIC_CLIST(&_st_free_stacks);
+_st_clist_t _st_free_stacks = ST_INIT_STATIC_CLIST(&_st_free_stacks);
 int _st_num_free_stacks = 0;
 int _st_randomize_stacks = 0;
 
 static char *_st_new_stk_segment(int size);
 
-st_stack_t *_st_stack_new(int stack_size)
+_st_stack_t *_st_stack_new(int stack_size)
 {
-  st_clist_t *qp;
-  st_stack_t *ts;
+  _st_clist_t *qp;
+  _st_stack_t *ts;
   int extra;
 
   for (qp = _st_free_stacks.next; qp != &_st_free_stacks; qp = qp->next) {
@@ -75,7 +75,7 @@ st_stack_t *_st_stack_new(int stack_size)
   }
 
   /* Make a new thread stack object. */
-  if ((ts = (st_stack_t *)calloc(1, sizeof(st_stack_t))) == NULL)
+  if ((ts = (_st_stack_t *)calloc(1, sizeof(_st_stack_t))) == NULL)
     return NULL;
   extra = _st_randomize_stacks ? _ST_PAGE_SIZE : 0;
   ts->vaddr_size = stack_size + 2*REDZONE + extra;
@@ -107,7 +107,7 @@ st_stack_t *_st_stack_new(int stack_size)
 /*
  * Free the stack for the current thread
  */
-void _st_stack_free(st_stack_t *ts)
+void _st_stack_free(_st_stack_t *ts)
 {
   if (!ts)
     return;

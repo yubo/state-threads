@@ -94,7 +94,7 @@ time_t st_time(void)
 
 int st_usleep(st_utime_t usecs)
 {
-  st_thread_t *me = _ST_CURRENT_THREAD();
+  _st_thread_t *me = _ST_CURRENT_THREAD();
 
   if (me->flags & _ST_FL_INTERRUPT) {
     me->flags &= ~_ST_FL_INTERRUPT;
@@ -130,11 +130,11 @@ int st_sleep(int secs)
  * Condition variable functions
  */
 
-st_cond_t *st_cond_new(void)
+_st_cond_t *st_cond_new(void)
 {
-  st_cond_t *cvar;
+  _st_cond_t *cvar;
 
-  cvar = (st_cond_t *) calloc(1, sizeof(st_cond_t));
+  cvar = (_st_cond_t *) calloc(1, sizeof(_st_cond_t));
   if (cvar) {
     ST_INIT_CLIST(&cvar->wait_q);
   }
@@ -143,7 +143,7 @@ st_cond_t *st_cond_new(void)
 }
 
 
-int st_cond_destroy(st_cond_t *cvar)
+int st_cond_destroy(_st_cond_t *cvar)
 {
   if (cvar->wait_q.next != &cvar->wait_q) {
     errno = EBUSY;
@@ -156,9 +156,9 @@ int st_cond_destroy(st_cond_t *cvar)
 }
 
 
-int st_cond_timedwait(st_cond_t *cvar, st_utime_t timeout)
+int st_cond_timedwait(_st_cond_t *cvar, st_utime_t timeout)
 {
-  st_thread_t *me = _ST_CURRENT_THREAD();
+  _st_thread_t *me = _ST_CURRENT_THREAD();
   int rv;
 
   if (me->flags & _ST_FL_INTERRUPT) {
@@ -194,16 +194,16 @@ int st_cond_timedwait(st_cond_t *cvar, st_utime_t timeout)
 }
 
 
-int st_cond_wait(st_cond_t *cvar)
+int st_cond_wait(_st_cond_t *cvar)
 {
   return st_cond_timedwait(cvar, ST_UTIME_NO_TIMEOUT);
 }
 
 
-int _st_cond_signal(st_cond_t *cvar, int broadcast)
+static int _st_cond_signal(_st_cond_t *cvar, int broadcast)
 {
-  st_thread_t *thread;
-  st_clist_t *q;
+  _st_thread_t *thread;
+  _st_clist_t *q;
 
   for (q = cvar->wait_q.next; q != &cvar->wait_q; q = q->next) {
     thread = _ST_THREAD_WAITQ_PTR(q);
@@ -223,13 +223,13 @@ int _st_cond_signal(st_cond_t *cvar, int broadcast)
 }
 
 
-int st_cond_signal(st_cond_t *cvar)
+int st_cond_signal(_st_cond_t *cvar)
 {
   return _st_cond_signal(cvar, 0);
 }
 
 
-int st_cond_broadcast(st_cond_t *cvar)
+int st_cond_broadcast(_st_cond_t *cvar)
 {
   return _st_cond_signal(cvar, 1);
 }
@@ -239,11 +239,11 @@ int st_cond_broadcast(st_cond_t *cvar)
  * Mutex functions
  */
 
-st_mutex_t *st_mutex_new(void)
+_st_mutex_t *st_mutex_new(void)
 {
-  st_mutex_t *lock;
+  _st_mutex_t *lock;
 
-  lock = (st_mutex_t *) calloc(1, sizeof(st_mutex_t));
+  lock = (_st_mutex_t *) calloc(1, sizeof(_st_mutex_t));
   if (lock) {
     ST_INIT_CLIST(&lock->wait_q);
     lock->owner = NULL;
@@ -253,7 +253,7 @@ st_mutex_t *st_mutex_new(void)
 }
 
 
-int st_mutex_destroy(st_mutex_t *lock)
+int st_mutex_destroy(_st_mutex_t *lock)
 {
   if (lock->owner != NULL || lock->wait_q.next != &lock->wait_q) {
     errno = EBUSY;
@@ -266,9 +266,9 @@ int st_mutex_destroy(st_mutex_t *lock)
 }
 
 
-int st_mutex_lock(st_mutex_t *lock)
+int st_mutex_lock(_st_mutex_t *lock)
 {
-  st_thread_t *me = _ST_CURRENT_THREAD();
+  _st_thread_t *me = _ST_CURRENT_THREAD();
 
   if (me->flags & _ST_FL_INTERRUPT) {
     me->flags &= ~_ST_FL_INTERRUPT;
@@ -305,10 +305,10 @@ int st_mutex_lock(st_mutex_t *lock)
 }
 
 
-int st_mutex_unlock(st_mutex_t *lock)
+int st_mutex_unlock(_st_mutex_t *lock)
 {
-  st_thread_t *thread;
-  st_clist_t *q;
+  _st_thread_t *thread;
+  _st_clist_t *q;
 
   if (lock->owner != _ST_CURRENT_THREAD()) {
     errno = EPERM;
@@ -333,7 +333,7 @@ int st_mutex_unlock(st_mutex_t *lock)
 }
 
 
-int st_mutex_trylock(st_mutex_t *lock)
+int st_mutex_trylock(_st_mutex_t *lock)
 {
   if (lock->owner != NULL) {
     errno = EBUSY;

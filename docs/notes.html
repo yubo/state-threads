@@ -11,7 +11,7 @@
 <LI><A HREF=#signals>Signals</A></LI>
 <LI><A HREF=#intra>Intra-Process Synchronization</A></LI>
 <LI><A HREF=#inter>Inter-Process Synchronization</A></LI>
-<LI><A HREF=#disk>Disk I/O</A></LI>
+<LI><A HREF=#nonnet>Non-Network I/O</A></LI>
 <LI><A HREF=#timeouts>Timeouts</A></LI>
 </UL>
 </B>
@@ -76,9 +76,21 @@ defined.</LI>
 All machine-dependent feature test macros should be defined in the
 <TT>md.h</TT> header file.
 <P>
-The current version of the library is ported to IRIX 6.x (both 32 and 
-64 bit), Linux (kernel 2.x and glibc 2.x), Solaris 2.x (SunOS 5.x), AIX 4.x,
-HP-UX 11 (both 32 and 64 bit), Tru64/OSF1, OpenBSD and FreeBSD.
+The current version of the library is ported to:
+<UL>
+  <LI>IRIX 6.x (both 32 and 64 bit)</LI>
+  <LI>Linux (kernel 2.x and glibc 2.x) on x86, Alpha, MIPS and MIPSEL,
+  SPARC, ARM, PowerPC, 68k, HPPA, S390, and IA-64</LI>
+  <LI>Solaris 2.x (SunOS 5.x) on x86 and SPARC</LI>
+  <LI>AIX 4.x</LI>
+  <LI>HP-UX 11 (both 32 and 64 bit)</LI>
+  <LI>Tru64/OSF1</LI>
+  <LI>FreeBSD on x86 and Alpha</LI>
+  <LI>OpenBSD on x86, Alpha, and SPARC</LI>
+  <LI>NetBSD on x86, Alpha, and SPARC</LI>
+  <LI>Darwin (MacOS X)</LI>
+  <LI>Cygwin</LI>
+</UL>
 <P>
 
 <A NAME="signals">
@@ -325,18 +337,24 @@ using the State Threads library:
 </OL>
 <P>
 
-<A NAME="disk">
-<H3>Disk I/O</H3>
-The State Threads architecture uses non-blocking network I/O for concurrent
-processing of multiple user connections.  This architecture has a drawback:
-the entire process and all its threads may block for the duration of a
-<I>disk</I> I/O operation (this is applicable mostly to disk <I>reads</I>;
-disk <I>writes</I> are usually performed asynchronously -- data goes to the
-buffer cache to be written to disk later).  Fortunately, disk I/O (unlike
-network I/O) always takes a finite and predictable amount of time.
-Nevertheless, disk I/O reduces throughput of the system and increases response
-times.  There are several ways to design an application to overcome this
+<A NAME="nonnet">
+<H3>Non-Network I/O</H3>
+
+The State Threads architecture uses non-blocking I/O on
+<TT>st_netfd_t</TT> objects for concurrent processing of multiple user
+connections.  This architecture has a drawback:  the entire process and
+all its threads may block for the duration of a <I>disk</I> or other
+non-network I/O operation, whether through State Threads I/O functions,
+direct system calls, or standard I/O functions.  (This is applicable
+mostly to disk <I>reads</I>; disk <I>writes</I> are usually performed
+asynchronously -- data goes to the buffer cache to be written to disk
+later.)  Fortunately, disk I/O (unlike network I/O) usually takes a
+finite and predictable amount of time, but this may not be true for
+special devices or user input devices (including stdin).  Nevertheless,
+such I/O reduces throughput of the system and increases response times.
+There are several ways to design an application to overcome this
 drawback:
+
 <P>
 <UL>
 <LI>Create several identical main processes as described above (symmetric
@@ -344,7 +362,7 @@ drawback:
     overall throughput of the system.</LI>
 <P>
 <LI>Create multiple "helper" processes in addition to the main process that
-    will handle blocking disk I/O operations (asymmetric architecture).
+    will handle blocking I/O operations (asymmetric architecture).
     This approach was suggested for Web servers in a
     <A HREF="http://www.cs.rice.edu/~vivek/flash99/">paper</A> by Peter
     Druschel et al. In this architecture the main process communicates with

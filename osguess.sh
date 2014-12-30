@@ -32,9 +32,11 @@ case "$sys_info" in
   *-sgi-irix6*    ) OS=IRIX       ;;
   ia64-*-linux*   ) OS=LINUX_IA64 ;;
   *-linux*        ) OS=LINUX      ;;
+  *-netbsd*       ) OS=NETBSD     ;;
   *-openbsd*      ) OS=OPENBSD    ;;
   *-dec-osf*      ) OS=OSF1       ;;
   *-solaris2*     ) OS=SOLARIS    ;;
+  *-darwin*       ) OS=DARWIN     ;;
   *               ) OS=
                     echo "Sorry, unsupported OS"
                     exit 1        ;;

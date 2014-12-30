@@ -77,6 +77,7 @@ _ia64_cxt_save:
         add r3 = 8,in0
         ;;
         st8.spill.nta [r2] = sp,16    // r12 (sp)
+        ;;
         st8.spill.nta [r3] = gp,16    // r1  (gp)
         ;;
         st8.nta [r2] = r16,16         // save caller's unat
@@ -84,6 +85,7 @@ _ia64_cxt_save:
         add r8 = 0xb0,in0
         ;;   
         st8.spill.nta [r2] = r4,16    // r4
+        ;;
         st8.spill.nta [r3] = r5,16    // r5
         add r9 = 0xc0,in0
         ;;
@@ -126,6 +128,7 @@ _ia64_cxt_save:
         stf.spill.nta [r9] = f31
 
         st8.spill.nta [r2] = r6,16    // r6
+        ;;
         st8.spill.nta [r3] = r7,16    // r7
         ;;
         mov r23 = ar.bsp

@@ -49,8 +49,8 @@
 
 
 /* Global data */
-st_vp_t _st_this_vp;            /* This VP */
-st_thread_t *_st_this_thread;   /* Current thread */
+_st_vp_t _st_this_vp;           /* This VP */
+_st_thread_t *_st_this_thread;  /* Current thread */
 int _st_active_count = 0;       /* Active thread count */
 
 time_t _st_curr_time = 0;       /* Current time as returned by time(2) */
@@ -61,8 +61,8 @@ int st_poll(struct pollfd *pds, int npds, st_utime_t timeout)
 {
   struct pollfd *pd;
   struct pollfd *epd = pds + npds;
-  st_pollq_t pq;
-  st_thread_t *me = _ST_CURRENT_THREAD();
+  _st_pollq_t pq;
+  _st_thread_t *me = _ST_CURRENT_THREAD();
   int n;
 
   if (me->flags & _ST_FL_INTERRUPT) {
@@ -146,7 +146,7 @@ int st_poll(struct pollfd *pds, int npds, st_utime_t timeout)
 
 void _st_vp_schedule(void)
 {
-  st_thread_t *thread;
+  _st_thread_t *thread;
 
   if (_ST_RUNQ.next != &_ST_RUNQ) {
     /* Pull thread off of the run queue */
@@ -169,7 +169,7 @@ void _st_vp_schedule(void)
  */
 int st_init(void)
 {
-  st_thread_t *thread;
+  _st_thread_t *thread;
 
   if (_st_active_count) {
     /* Already initialized */
@@ -179,7 +179,7 @@ int st_init(void)
   if (_st_io_init() < 0)
     return -1;
 
-  memset(&_st_this_vp, 0, sizeof(st_vp_t));
+  memset(&_st_this_vp, 0, sizeof(_st_vp_t));
 
   ST_INIT_CLIST(&_ST_RUNQ);
   ST_INIT_CLIST(&_ST_IOQ);
@@ -216,8 +216,8 @@ int st_init(void)
   /*
    * Initialize primordial thread
    */
-  thread = (st_thread_t *) calloc(1, sizeof(st_thread_t) +
-				  (ST_KEYS_MAX * sizeof(void *)));
+  thread = (_st_thread_t *) calloc(1, sizeof(_st_thread_t) +
+				   (ST_KEYS_MAX * sizeof(void *)));
   if (!thread)
     return -1;
   thread->private_data = (void **) (thread + 1);
@@ -239,7 +239,7 @@ int st_init(void)
 /* ARGSUSED */
 void *_st_idle_thread_start(void *arg)
 {
-  st_thread_t *me = _ST_CURRENT_THREAD();
+  _st_thread_t *me = _ST_CURRENT_THREAD();
 
   while (_st_active_count > 0) {
     /* Idle vp till I/O is ready or the smallest timeout expired */
@@ -268,9 +268,9 @@ void _st_vp_idle(void)
   fd_set r, w, e;
   fd_set *rp, *wp, *ep;
   int nfd, pq_max_osfd, osfd;
-  st_clist_t *q;
+  _st_clist_t *q;
   st_utime_t min_timeout;
-  st_pollq_t *pq;
+  _st_pollq_t *pq;
   int notify;
   struct pollfd *pds, *epds;
   short events, revents;
@@ -378,8 +378,8 @@ void _st_vp_idle(void)
 
 void _st_find_bad_fd(void)
 {
-  st_clist_t *q;
-  st_pollq_t *pq;
+  _st_clist_t *q;
+  _st_pollq_t *pq;
   int notify;
   struct pollfd *pds, *epds;
   int pq_max_osfd, osfd;
@@ -451,9 +451,9 @@ void _st_find_bad_fd(void)
 void _st_vp_idle(void)
 {
   int timeout, nfd;
-  st_clist_t *q;
+  _st_clist_t *q;
   st_utime_t min_timeout;
-  st_pollq_t *pq;
+  _st_pollq_t *pq;
   struct pollfd *pds, *epds, *pollfds;
 
   /*
@@ -520,7 +520,7 @@ void _st_vp_idle(void)
 
 void st_thread_exit(void *retval)
 {
-  st_thread_t *thread = _ST_CURRENT_THREAD();
+  _st_thread_t *thread = _ST_CURRENT_THREAD();
 
   thread->retval = retval;
   _st_thread_cleanup(thread);
@@ -554,9 +554,9 @@ void st_thread_exit(void *retval)
 }
 
 
-int st_thread_join(st_thread_t *thread, void **retvalp)
+int st_thread_join(_st_thread_t *thread, void **retvalp)
 {
-  st_cond_t *term = thread->term;
+  _st_cond_t *term = thread->term;
 
   /* Can't join a non-joinable thread */
   if (term == NULL) {
@@ -596,7 +596,7 @@ int st_thread_join(st_thread_t *thread, void **retvalp)
 
 void _st_thread_main(void)
 {
-  st_thread_t *thread = _ST_CURRENT_THREAD();
+  _st_thread_t *thread = _ST_CURRENT_THREAD();
 
   /*
    * Cap the stack by zeroing out the saved return address register
@@ -613,11 +613,11 @@ void _st_thread_main(void)
 }
 
 
-void _st_add_sleep_q(st_thread_t *thread, st_utime_t timeout)
+void _st_add_sleep_q(_st_thread_t *thread, st_utime_t timeout)
 {
   st_utime_t sleep;
-  st_clist_t *q;
-  st_thread_t *t;
+  _st_clist_t *q;
+  _st_thread_t *t;
 
   /* Check if we are longest timeout */
   if (timeout >= _ST_SLEEPQMAX) {
@@ -656,10 +656,10 @@ void _st_add_sleep_q(st_thread_t *thread, st_utime_t timeout)
 /*
  * If "expired" is true, a sleeper has timed out
  */
-void _st_del_sleep_q(st_thread_t *thread, int expired)
+void _st_del_sleep_q(_st_thread_t *thread, int expired)
 {
-  st_clist_t *q;
-  st_thread_t *t;
+  _st_clist_t *q;
+  _st_thread_t *t;
 
   /* Remove from sleep queue */
   ST_ASSERT(thread->flags & _ST_FL_ON_SLEEPQ);
@@ -688,7 +688,7 @@ void _st_del_sleep_q(st_thread_t *thread, int expired)
 
 void _st_vp_check_clock(void)
 {
-  st_thread_t *thread;
+  _st_thread_t *thread;
   st_utime_t elapsed, now;
  
   now = st_utime();
@@ -725,7 +725,7 @@ void _st_vp_check_clock(void)
 }
 
 
-void st_thread_interrupt(st_thread_t *thread)
+void st_thread_interrupt(_st_thread_t *thread)
 {
   /* If thread is already dead */
   if (thread->state == _ST_ST_ZOMBIE)
@@ -745,11 +745,11 @@ void st_thread_interrupt(st_thread_t *thread)
 }
 
 
-st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
-			      int joinable, int stk_size)
+_st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
+			       int joinable, int stk_size)
 {
-  st_thread_t *thread;
-  st_stack_t *stack;
+  _st_thread_t *thread;
+  _st_stack_t *stack;
   void **ptds;
   char *sp;
 #ifdef __ia64__
@@ -784,8 +784,8 @@ st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
 #endif
   sp = sp - (ST_KEYS_MAX * sizeof(void *));
   ptds = (void **) sp;
-  sp = sp - sizeof(st_thread_t);
-  thread = (st_thread_t *) sp;
+  sp = sp - sizeof(_st_thread_t);
+  thread = (_st_thread_t *) sp;
 
   /* Make stack 64-byte aligned */
   if ((unsigned long)sp & 0x3f)
@@ -793,8 +793,8 @@ st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
   stack->sp = sp - _ST_STACK_PAD_SIZE;
 #elif defined (MD_STACK_GROWS_UP)
   sp = stack->stk_bottom;
-  thread = (st_thread_t *) sp;
-  sp = sp + sizeof(st_thread_t);
+  thread = (_st_thread_t *) sp;
+  sp = sp + sizeof(_st_thread_t);
   ptds = (void **) sp;
   sp = sp + (ST_KEYS_MAX * sizeof(void *));
 
@@ -806,7 +806,7 @@ st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
 #error Unknown OS
 #endif
 
-  memset(thread, 0, sizeof(st_thread_t));
+  memset(thread, 0, sizeof(_st_thread_t));
   memset(ptds, 0, ST_KEYS_MAX * sizeof(void *));
 
   /* Initialize thread */
@@ -842,7 +842,7 @@ st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
 }
 
 
-st_thread_t *st_thread_self(void)
+_st_thread_t *st_thread_self(void)
 {
   return _ST_CURRENT_THREAD();
 }
@@ -850,7 +850,7 @@ st_thread_t *st_thread_self(void)
 
 #ifdef DEBUG
 /* ARGSUSED */
-void _st_show_thread_stack(st_thread_t *thread, const char *messg)
+void _st_show_thread_stack(_st_thread_t *thread, const char *messg)
 {
 
 }
@@ -860,9 +860,9 @@ int _st_iterate_threads_flag = 0;
 
 void _st_iterate_threads(void)
 {
-  static st_thread_t *thread = NULL;
+  static _st_thread_t *thread = NULL;
   static jmp_buf orig_jb, save_jb;
-  st_clist_t *q;
+  _st_clist_t *q;
 
   if (!_st_iterate_threads_flag) {
     if (thread) {

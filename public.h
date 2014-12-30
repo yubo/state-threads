@@ -42,8 +42,35 @@
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <time.h>
-#include <poll.h>
 #include <errno.h>
+
+#if defined(__MACH__) && defined(__APPLE__)
+struct pollfd
+{
+	int fd;
+	short events;
+	short revents;
+};
+
+#define POLLIN          0x0001          /* fd is readable */
+#define POLLPRI         0x0002          /* high priority info at fd */
+#define POLLOUT         0x0004          /* fd is writeable (won't block) */
+#define POLLRDNORM      0x0040          /* normal data is readable */
+#define POLLWRNORM      POLLOUT
+#define POLLRDBAND      0x0080          /* out-of-band data is readable */
+#define POLLWRBAND      0x0100          /* out-of-band data is writeable */
+
+#define POLLNORM        POLLRDNORM
+
+#define POLLERR         0x0008          /* fd has error condition */
+#define POLLHUP         0x0010          /* fd has been hung up on */
+#define POLLNVAL        0x0020          /* invalid pollfd entry */
+
+#define POLLREMOVE      0x0800  /* remove a cached poll fd from /dev/poll */
+
+#else
+#include <poll.h>
+#endif
 
 #ifndef ETIME
 #define ETIME ETIMEDOUT
@@ -54,11 +81,10 @@ extern "C" {
 #endif
 
 typedef unsigned long long  st_utime_t;
-typedef void *  st_thread_t;
-typedef void *  st_cond_t;
-typedef void *  st_mutex_t;
-typedef void *  st_netfd_t;
-
+typedef struct _st_thread * st_thread_t;
+typedef struct _st_cond *   st_cond_t;
+typedef struct _st_mutex *  st_mutex_t;
+typedef struct _st_netfd *  st_netfd_t;
 
 extern int st_init(void);
 extern int st_getfdlimit(void);
@@ -108,7 +134,7 @@ extern int st_netfd_poll(st_netfd_t fd, int how, st_utime_t timeout);
 extern int st_poll(struct pollfd *pds, int npds, st_utime_t timeout);
 extern st_netfd_t st_accept(st_netfd_t fd, struct sockaddr *addr, int *addrlen,
 			    st_utime_t timeout);
-extern int st_connect(st_netfd_t fd, struct sockaddr *addr, int addrlen,
+extern int st_connect(st_netfd_t fd, const struct sockaddr *addr, int addrlen,
 		      st_utime_t timeout);
 extern ssize_t st_read(st_netfd_t fd, void *buf, size_t nbyte,
 		       st_utime_t timeout);
@@ -126,8 +152,13 @@ extern int st_recvfrom(st_netfd_t fd, void *buf, int len,
 		       struct sockaddr *from, int *fromlen,
 		       st_utime_t timeout);
 extern int st_sendto(st_netfd_t fd, const void *msg, int len,
-		     struct sockaddr *to, int tolen, st_utime_t timeout);
+		     const struct sockaddr *to, int tolen, st_utime_t timeout);
 extern st_netfd_t st_open(const char *path, int oflags, mode_t mode);
+
+#ifdef DEBUG
+extern void _st_show_thread_stack(st_thread_t thread, const char *messg);
+extern void _st_iterate_threads(void);
+#endif
 
 #ifdef __cplusplus
 }

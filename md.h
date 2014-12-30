@@ -86,6 +86,60 @@
   (void) time_base_to_time(&rt, TIMEBASE_SZ); \
   return (rt.tb_high * 1000000LL + rt.tb_low / 1000)
 
+#elif defined (CYGWIN)
+
+#define MD_STACK_GROWS_DOWN
+#define MD_USE_BSD_ANON_MMAP
+#define MD_ACCEPT_NB_NOT_INHERITED
+#define MD_ALWAYS_UNSERIALIZED_ACCEPT
+
+#define MD_SETJMP(env) setjmp(env)
+#define MD_LONGJMP(env, val) longjmp(env, val)
+
+#define MD_JB_SP  7
+
+#define MD_GET_SP(_t) (_t)->context[MD_JB_SP]
+
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO                             \
+  if (MD_SETJMP((_thread)->context))         \
+    _main();                                 \
+  MD_GET_SP(_thread) = (long) (_sp);         \
+  ST_END_MACRO
+
+#define MD_GET_UTIME()            \
+  struct timeval tv;              \
+  (void) gettimeofday(&tv, NULL); \
+  return (tv.tv_sec * 1000000LL + tv.tv_usec)
+
+#elif defined (DARWIN)
+
+#define MD_STACK_GROWS_DOWN
+#define MD_USE_BSD_ANON_MMAP
+#define MD_ACCEPT_NB_INHERITED
+#define MD_ALWAYS_UNSERIALIZED_ACCEPT
+
+#define MD_SETJMP(env) _setjmp(env)
+#define MD_LONGJMP(env, val) _longjmp(env, val)
+
+#if defined(__ppc__)
+#define MD_JB_SP  0
+#else
+#error Unknown CPU architecture
+#endif
+
+#define MD_INIT_CONTEXT(_thread, _sp, _main)   \
+  ST_BEGIN_MACRO                               \
+  if (MD_SETJMP((_thread)->context))           \
+    _main();                                   \
+  (_thread)->context[MD_JB_SP] = (long) (_sp); \
+  ST_END_MACRO
+
+#define MD_GET_UTIME()            \
+  struct timeval tv;              \
+  (void) gettimeofday(&tv, NULL); \
+  return (tv.tv_sec * 1000000LL + tv.tv_usec)
+
 #elif defined (FREEBSD)
 
 #define MD_STACK_GROWS_DOWN
@@ -203,23 +257,34 @@
 
 #elif defined (LINUX)
 
-#define MD_STACK_GROWS_DOWN
+/*
+ * These are properties of the linux kernel and are the same on every
+ * flavor and architecture.
+ */
 #define MD_USE_BSD_ANON_MMAP
 #define MD_ACCEPT_NB_NOT_INHERITED
 #define MD_ALWAYS_UNSERIALIZED_ACCEPT
 
-#ifndef __ia64__
-#define MD_SETJMP(env) setjmp(env)
-#define MD_LONGJMP(env, val) longjmp(env, val)
+/*
+ * All architectures and flavors of linux have the gettimeofday
+ * function but if you know of a faster way, use it.
+ */
+#define MD_GET_UTIME()            \
+  struct timeval tv;              \
+  (void) gettimeofday(&tv, NULL); \
+  return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
-#define MD_INIT_CONTEXT(_thread, _sp, _main)            \
-  ST_BEGIN_MACRO                                        \
-  if (MD_SETJMP((_thread)->context))                    \
-    _main();                                            \
-  (_thread)->context[0].__jmpbuf[JB_SP] = (long) (_sp); \
-  ST_END_MACRO
-#else
-/* IA-64 architecture */
+#if defined(__ia64__)
+#define MD_STACK_GROWS_DOWN
+
+/*
+ * IA-64 architecture.  Besides traditional memory call stack, IA-64
+ * uses general register stack.  Thus each thread needs a backing store
+ * for register stack in addition to memory stack.  Standard
+ * setjmp()/longjmp() cannot be used for thread context switching
+ * because their implementation implicitly assumes that only one
+ * register stack exists.
+ */
 #define MD_SETJMP(env) _ia64_cxt_save(env)
 #define MD_LONGJMP(env, val) _ia64_cxt_restore(env, val)
 
@@ -238,7 +303,149 @@ extern void _ia64_cxt_restore(jmp_buf env, int val);
   (_thread)->context[0].__jmpbuf[0]  = (long) (_sp);                     \
   (_thread)->context[0].__jmpbuf[17] = (long) (_bsp);                    \
   ST_END_MACRO
-#endif /* !__ia64__ */
+
+#elif defined(__mips__)
+#define MD_STACK_GROWS_DOWN
+
+#define MD_SETJMP(env) setjmp(env)
+#define MD_LONGJMP(env, val) longjmp(env, val)
+
+#define MD_INIT_CONTEXT(_thread, _sp, _main)               \
+  ST_BEGIN_MACRO                                           \
+  MD_SETJMP((_thread)->context);                           \
+  _thread->context[0].__jmpbuf[0].__pc = (__ptr_t) _main;  \
+  _thread->context[0].__jmpbuf[0].__sp = _sp;              \
+  ST_END_MACRO
+  
+#else /* Not IA-64 or mips everyone else just uses setjmp/longjmp */
+
+/*
+ * On linux, there are a few styles of jmpbuf format.  These vary based
+ * on architecture/glibc combination.
+ */
+ 
+/*
+ * However, all of these architectures will be using setjmp/longjmp.
+ */
+#define MD_SETJMP(env) setjmp(env)
+#define MD_LONGJMP(env, val) longjmp(env, val)
+ 
+/*
+ * Most of the glibc based toggles were lifted from:
+ * mozilla/nsprpub/pr/include/md/_linux.h
+ */
+
+#if defined(__powerpc__)
+#define MD_STACK_GROWS_DOWN
+
+#if (__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 1)
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[JB_GPR1]   
+#else
+#warning "Untested use of old glibc on powerpc"
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__misc[0]
+#endif /* glibc 2.1 or later */
+
+#elif defined(__alpha)
+#define MD_STACK_GROWS_DOWN
+
+#if defined(__GLIBC__) && __GLIBC__ >= 2
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[JB_SP]
+#else
+#warning "Untested use of old glibc on alpha"
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__sp
+#endif
+
+#elif defined(__mc68000__)
+#define MD_STACK_GROWS_DOWN
+
+/* m68k still uses old style sigjmp_buf */
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__sp
+
+#elif defined(__sparc__)
+#define MD_STACK_GROWS_DOWN
+
+#if defined(__GLIBC__) && __GLIBC__ >= 2
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[JB_SP]
+#else
+#warning "Untested use of old glic on sparc -- also using odd mozilla derived __fp"
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__fp
+#endif
+
+#elif defined(__i386__)
+#define MD_STACK_GROWS_DOWN
+
+#if defined(__GLIBC__) && __GLIBC__ >= 2
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[JB_SP]
+#else
+#warning "Untested use of old glibc on i386"
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__sp
+#endif
+
+#elif defined(__arm__)
+#define MD_STACK_GROWS_DOWN
+
+#if defined(__GLIBC__) && __GLIBC__ >= 2
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[20]
+#else
+#error "ARM/Linux pre-glibc2 not supported yet"
+#endif /* defined(__GLIBC__) && __GLIBC__ >= 2 */
+
+#elif defined(__s390__)
+#define MD_STACK_GROWS_DOWN
+
+/* There is no JB_SP in glibc at this time. (glibc 2.2.5)
+ */
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__gregs[9]
+
+#elif defined(__hppa__)
+#define MD_STACK_GROWS_UP
+
+/* yes, this is gross, unfortunately at the moment (2002/08/01) there is
+ * a bug in hppa's glibc header definition for JB_SP, so we can't
+ * use that...
+ */
+#define MD_GET_SP(_t) (*(long *)(((char *)&(_t)->context[0].__jmpbuf[0]) + 76))
+
+#else
+#error "Unknown CPU architecture"
+#endif /* Cases with common MD_INIT_CONTEXT and different SP locations */
+
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO                             \
+  if (MD_SETJMP((_thread)->context))         \
+    _main();                                 \
+  MD_GET_SP(_thread) = (long) (_sp);         \
+  ST_END_MACRO
+
+#endif /* Cases with different MD_INIT_CONTEXT */
+
+#elif defined (NETBSD)
+
+#define MD_STACK_GROWS_DOWN
+#define MD_USE_BSD_ANON_MMAP
+#define MD_ACCEPT_NB_INHERITED
+#define MD_ALWAYS_UNSERIALIZED_ACCEPT
+#define MD_HAVE_SOCKLEN_T
+
+#define MD_SETJMP(env) _setjmp(env)
+#define MD_LONGJMP(env, val) _longjmp(env, val)
+
+#if defined(__i386__)
+#define MD_JB_SP   2
+#elif defined(__alpha__)
+#define MD_JB_SP  34
+#elif defined(__sparc__)
+#define MD_JB_SP   0
+#else
+#error Unknown CPU architecture
+#endif
+
+#define MD_INIT_CONTEXT(_thread, _sp, _main)   \
+  ST_BEGIN_MACRO                               \
+  if (MD_SETJMP((_thread)->context))           \
+    _main();                                   \
+  (_thread)->context[MD_JB_SP] = (long) (_sp); \
+  ST_END_MACRO
 
 #define MD_GET_UTIME()            \
   struct timeval tv;              \
@@ -259,6 +466,8 @@ extern void _ia64_cxt_restore(jmp_buf env, int val);
 #define MD_JB_SP   2
 #elif defined(__alpha__)
 #define MD_JB_SP  34
+#elif defined(__sparc__)
+#define MD_JB_SP   0
 #else
 #error Unknown CPU architecture
 #endif

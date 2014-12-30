@@ -62,11 +62,11 @@
 #define _LOCAL_MAXIOV  16
 
 /* File descriptor object free list */
-static st_netfd_t *_st_netfd_freelist = NULL;
+static _st_netfd_t *_st_netfd_freelist = NULL;
 /* Maximum number of file descriptors that the process can open */
 static int _st_osfd_limit = -1;
 
-static void _st_netfd_free_aux_data(st_netfd_t *fd);
+static void _st_netfd_free_aux_data(_st_netfd_t *fd);
 
 int _st_io_init(void)
 {
@@ -102,7 +102,7 @@ int st_getfdlimit(void)
 }
 
 
-void st_netfd_free(st_netfd_t *fd)
+void st_netfd_free(_st_netfd_t *fd)
 {
   if (!fd->inuse)
     return;
@@ -119,9 +119,9 @@ void st_netfd_free(st_netfd_t *fd)
 }
 
 
-static st_netfd_t *_st_netfd_new(int osfd, int nonblock, int is_socket)
+static _st_netfd_t *_st_netfd_new(int osfd, int nonblock, int is_socket)
 {
-  st_netfd_t *fd;
+  _st_netfd_t *fd;
   int flags = 1;
 
 #ifndef USE_POLL
@@ -135,7 +135,7 @@ static st_netfd_t *_st_netfd_new(int osfd, int nonblock, int is_socket)
     fd = _st_netfd_freelist;
     _st_netfd_freelist = _st_netfd_freelist->next;
   } else {
-    fd = calloc(1, sizeof(st_netfd_t));
+    fd = calloc(1, sizeof(_st_netfd_t));
     if (!fd)
       return NULL;
   }
@@ -160,33 +160,33 @@ static st_netfd_t *_st_netfd_new(int osfd, int nonblock, int is_socket)
 }
 
 
-st_netfd_t *st_netfd_open(int osfd)
+_st_netfd_t *st_netfd_open(int osfd)
 {
   return _st_netfd_new(osfd, 1, 0);
 }
 
 
-st_netfd_t *st_netfd_open_socket(int osfd)
+_st_netfd_t *st_netfd_open_socket(int osfd)
 {
   return _st_netfd_new(osfd, 1, 1);
 }
 
 
-int st_netfd_close(st_netfd_t *fd)
+int st_netfd_close(_st_netfd_t *fd)
 {
   st_netfd_free(fd);
   return close(fd->osfd);
 }
 
 
-int st_netfd_fileno(st_netfd_t *fd)
+int st_netfd_fileno(_st_netfd_t *fd)
 {
   return (fd->osfd);
 }
 
 
-void st_netfd_setspecific(st_netfd_t *fd, void *value,
-			  st_destructor_t destructor)
+void st_netfd_setspecific(_st_netfd_t *fd, void *value,
+			  _st_destructor_t destructor)
 {
   if (value != fd->private_data) {
     /* Free up previously set non-NULL data value */
@@ -198,7 +198,7 @@ void st_netfd_setspecific(st_netfd_t *fd, void *value,
 }
 
 
-void *st_netfd_getspecific(st_netfd_t *fd)
+void *st_netfd_getspecific(_st_netfd_t *fd)
 {
   return (fd->private_data);
 }
@@ -207,7 +207,7 @@ void *st_netfd_getspecific(st_netfd_t *fd)
 /*
  * Wait for I/O on a single descriptor.
  */
-int st_netfd_poll(st_netfd_t *fd, int how, st_utime_t timeout)
+int st_netfd_poll(_st_netfd_t *fd, int how, st_utime_t timeout)
 {
   struct pollfd pd;
   int n;
@@ -234,23 +234,23 @@ int st_netfd_poll(st_netfd_t *fd, int how, st_utime_t timeout)
 
 #ifdef MD_ALWAYS_UNSERIALIZED_ACCEPT
 /* No-op */
-int st_netfd_serialize_accept(st_netfd_t *fd)
+int st_netfd_serialize_accept(_st_netfd_t *fd)
 {
   fd->aux_data = NULL;
   return 0;
 }
 
 /* No-op */
-static void _st_netfd_free_aux_data(st_netfd_t *fd)
+static void _st_netfd_free_aux_data(_st_netfd_t *fd)
 {
   fd->aux_data = NULL;
 }
 
-st_netfd_t *st_accept(st_netfd_t *fd, struct sockaddr *addr, int *addrlen,
-		      st_utime_t timeout)
+_st_netfd_t *st_accept(_st_netfd_t *fd, struct sockaddr *addr, int *addrlen,
+		       st_utime_t timeout)
 {
   int osfd, err;
-  st_netfd_t *newfd;
+  _st_netfd_t *newfd;
 
   while ((osfd = accept(fd->osfd, addr, (socklen_t *)addrlen)) < 0) {
     if (errno == EINTR)
@@ -288,16 +288,16 @@ st_netfd_t *st_accept(st_netfd_t *fd, struct sockaddr *addr, int *addrlen,
  * The following code serializes accept()'s without process blocking.
  * A pipe is used as an inter-process semaphore.
  */
-int st_netfd_serialize_accept(st_netfd_t *fd)
+int st_netfd_serialize_accept(_st_netfd_t *fd)
 {
-  st_netfd_t **p;
+  _st_netfd_t **p;
   int osfd[2], err;
 
   if (fd->aux_data) {
     errno = EINVAL;
     return -1;
   }
-  if ((p = (st_netfd_t **)calloc(2, sizeof(st_netfd_t *))) == NULL)
+  if ((p = (_st_netfd_t **)calloc(2, sizeof(_st_netfd_t *))) == NULL)
     return -1;
   if (pipe(osfd) < 0) {
     free(p);
@@ -323,9 +323,9 @@ int st_netfd_serialize_accept(st_netfd_t *fd)
   return -1;
 }
 
-static void _st_netfd_free_aux_data(st_netfd_t *fd)
+static void _st_netfd_free_aux_data(_st_netfd_t *fd)
 {
-  st_netfd_t **p = (st_netfd_t **) fd->aux_data;
+  _st_netfd_t **p = (_st_netfd_t **) fd->aux_data;
 
   st_netfd_close(p[0]);
   st_netfd_close(p[1]);
@@ -333,12 +333,12 @@ static void _st_netfd_free_aux_data(st_netfd_t *fd)
   fd->aux_data = NULL;
 }
 
-st_netfd_t *st_accept(st_netfd_t *fd, struct sockaddr *addr, int *addrlen,
-		      st_utime_t timeout)
+_st_netfd_t *st_accept(_st_netfd_t *fd, struct sockaddr *addr, int *addrlen,
+		       st_utime_t timeout)
 {
   int osfd, err;
-  st_netfd_t *newfd;
-  st_netfd_t **p = (st_netfd_t **) fd->aux_data;
+  _st_netfd_t *newfd;
+  _st_netfd_t **p = (_st_netfd_t **) fd->aux_data;
   ssize_t n;
   char c;
 
@@ -391,7 +391,7 @@ st_netfd_t *st_accept(st_netfd_t *fd, struct sockaddr *addr, int *addrlen,
 #endif /* MD_ALWAYS_UNSERIALIZED_ACCEPT */
 
 
-int st_connect(st_netfd_t *fd, struct sockaddr *addr, int addrlen,
+int st_connect(_st_netfd_t *fd, const struct sockaddr *addr, int addrlen,
 	       st_utime_t timeout)
 {
   int n, err = 0;
@@ -429,7 +429,7 @@ int st_connect(st_netfd_t *fd, struct sockaddr *addr, int addrlen,
 }
 
 
-ssize_t st_read(st_netfd_t *fd, void *buf, size_t nbyte, st_utime_t timeout)
+ssize_t st_read(_st_netfd_t *fd, void *buf, size_t nbyte, st_utime_t timeout)
 {
   ssize_t n;
 
@@ -447,7 +447,8 @@ ssize_t st_read(st_netfd_t *fd, void *buf, size_t nbyte, st_utime_t timeout)
 }
 
 
-int st_read_resid(st_netfd_t *fd, void *buf, size_t *resid, st_utime_t timeout)
+int st_read_resid(_st_netfd_t *fd, void *buf, size_t *resid,
+		  st_utime_t timeout)
 {
   ssize_t n;
 
@@ -472,7 +473,7 @@ int st_read_resid(st_netfd_t *fd, void *buf, size_t *resid, st_utime_t timeout)
 }
 
 
-ssize_t st_read_fully(st_netfd_t *fd, void *buf, size_t nbyte,
+ssize_t st_read_fully(_st_netfd_t *fd, void *buf, size_t nbyte,
 		      st_utime_t timeout)
 {
   size_t resid = nbyte;
@@ -481,7 +482,7 @@ ssize_t st_read_fully(st_netfd_t *fd, void *buf, size_t nbyte,
 }
 
 
-int st_write_resid(st_netfd_t *fd, const void *buf, size_t *resid,
+int st_write_resid(_st_netfd_t *fd, const void *buf, size_t *resid,
 		   st_utime_t timeout)
 {
   ssize_t n;
@@ -507,7 +508,7 @@ int st_write_resid(st_netfd_t *fd, const void *buf, size_t *resid,
 }
 
 
-ssize_t st_write(st_netfd_t *fd, const void *buf, size_t nbyte,
+ssize_t st_write(_st_netfd_t *fd, const void *buf, size_t nbyte,
 		 st_utime_t timeout)
 {
   size_t resid = nbyte;
@@ -516,7 +517,7 @@ ssize_t st_write(st_netfd_t *fd, const void *buf, size_t nbyte,
 }
 
 
-ssize_t st_writev(st_netfd_t *fd, const struct iovec *iov, int iov_size,
+ssize_t st_writev(_st_netfd_t *fd, const struct iovec *iov, int iov_size,
 		  st_utime_t timeout)
 {
   ssize_t n, rv;
@@ -595,7 +596,7 @@ ssize_t st_writev(st_netfd_t *fd, const struct iovec *iov, int iov_size,
 /*
  * Simple I/O functions for UDP.
  */
-int st_recvfrom(st_netfd_t *fd, void *buf, int len, struct sockaddr *from,
+int st_recvfrom(_st_netfd_t *fd, void *buf, int len, struct sockaddr *from,
 		int *fromlen, st_utime_t timeout)
 {
   int n;
@@ -615,8 +616,8 @@ int st_recvfrom(st_netfd_t *fd, void *buf, int len, struct sockaddr *from,
 }
 
 
-int st_sendto(st_netfd_t *fd, const void *msg, int len, struct sockaddr *to,
-	      int tolen, st_utime_t timeout)
+int st_sendto(_st_netfd_t *fd, const void *msg, int len,
+	      const struct sockaddr *to, int tolen, st_utime_t timeout)
 {
   int n;
 
@@ -637,10 +638,10 @@ int st_sendto(st_netfd_t *fd, const void *msg, int len, struct sockaddr *to,
 /*
  * To open FIFOs or other special files.
  */
-st_netfd_t *st_open(const char *path, int oflags, mode_t mode)
+_st_netfd_t *st_open(const char *path, int oflags, mode_t mode)
 {
   int osfd, err;
-  st_netfd_t *newfd;
+  _st_netfd_t *newfd;
 
   while ((osfd = open(path, oflags | O_NONBLOCK, mode)) < 0) {
     if (errno != EINTR)

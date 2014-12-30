@@ -47,14 +47,14 @@
 /*
  * Destructor table for per-thread private data
  */
-static st_destructor_t _st_destructors[ST_KEYS_MAX];
+static _st_destructor_t _st_destructors[ST_KEYS_MAX];
 static int key_max = 0;
 
 
 /*
  * Return a key to be used for thread specific data
  */
-int st_key_create(int *keyp, st_destructor_t destructor)
+int st_key_create(int *keyp, _st_destructor_t destructor)
 {
   if (key_max >= ST_KEYS_MAX) {
     errno = EAGAIN;
@@ -76,7 +76,7 @@ int st_key_getlimit(void)
 
 int st_thread_setspecific(int key, void *value)
 {
-  st_thread_t *me = _ST_CURRENT_THREAD();
+  _st_thread_t *me = _ST_CURRENT_THREAD();
 
   if (key < 0 || key >= key_max) {
     errno = EINVAL;
@@ -107,7 +107,7 @@ void *st_thread_getspecific(int key)
 /*
  * Free up all per-thread private data
  */
-void _st_thread_cleanup(st_thread_t *thread)
+void _st_thread_cleanup(_st_thread_t *thread)
 {
   int key;
 

@@ -33,12 +33,13 @@
 # GPL.
 
 # This is the full version of the libst library - modify carefully
-VERSION     = 1.3
+VERSION     = 1.4
 
 ##########################
 # Supported OSes:
 #
 #OS         = AIX
+#OS         = CYGWIN
 #OS         = FREEBSD
 #OS         = HPUX
 #OS         = HPUX_64
@@ -46,6 +47,7 @@ VERSION     = 1.3
 #OS         = IRIX_64
 #OS         = LINUX
 #OS         = LINUX_IA64
+#OS         = NETBSD
 #OS         = OPENBSD
 #OS         = OSF1
 #OS         = SOLARIS
@@ -73,12 +75,16 @@ ARFLAGS     = -rv
 LNFLAGS     = -s
 DSO_SUFFIX  = so
 
+MAJOR       = $(shell echo $(VERSION) | sed 's/^\([^\.]*\).*/\1/')
+DESC        = st.pc
 
 ##########################
 # Platform section.
 # Possible targets:
 
 TARGETS     = aix-debug aix-optimized               \
+              cygwin-debug cygwin-optimized         \
+              darwin-debug darwin-optimized         \
               freebsd-debug freebsd-optimized       \
               hpux-debug hpux-optimized             \
               hpux-64-debug hpux-64-optimized       \
@@ -86,6 +92,7 @@ TARGETS     = aix-debug aix-optimized               \
               irix-64-debug irix-64-optimized       \
               linux-debug linux-optimized           \
               linux-ia64-debug linux-ia64-optimized \
+              netbsd-debug netbsd-optimized         \
               openbsd-debug openbsd-optimized       \
               osf1-debug osf1-optimized             \
               solaris-debug solaris-optimized
@@ -105,6 +112,26 @@ endif
 ifneq ($(filter-out 4.1 4.2, $(AIX_VERSION)),)
 DEFINES     += -DMD_HAVE_SOCKLEN_T
 endif
+endif
+
+ifeq ($(OS), CYGWIN)
+TARGETDIR   = $(OS)_$(BUILD)
+CC          = gcc
+LD          = gcc
+DSO_SUFFIX  = dll
+SLIBRARY    = $(TARGETDIR)/libst.dll.a
+DLIBRARY    = $(TARGETDIR)/libst.dll
+DEF_FILE    = $(TARGETDIR)/libst.def
+LDFLAGS     = libst.def -shared --enable-auto-image-base -Wl,--output-def,$(DEF_FILE),--out-implib,$(SLIBRARY)
+OTHER_FLAGS = -Wall
+endif
+
+ifeq ($(OS), DARWIN)
+LD          = cc
+SFLAGS      = -fPIC -fno-common
+DSO_SUFFIX  = dylib
+LDFLAGS     = -dynamiclib -install_name /sw/lib/libst.$(MAJOR).$(DSO_SUFFIX) -compatibility_version $(MAJOR) -current_version $(VERSION)
+OTHER_FLAGS = -Wall
 endif
 
 ifeq ($(OS), FREEBSD)
@@ -143,6 +170,12 @@ ifeq ($(OS), LINUX_IA64)
 DEFINES     = -DLINUX
 EXTRA_OBJS  = $(TARGETDIR)/ia64asm.o
 endif
+SFLAGS      = -fPIC
+LDFLAGS     = -shared -soname=$(SONAME) -lc
+OTHER_FLAGS = -Wall
+endif
+
+ifeq ($(OS), NETBSD)
 SFLAGS      = -fPIC
 LDFLAGS     = -shared -soname=$(SONAME) -lc
 OTHER_FLAGS = -Wall
@@ -214,11 +247,24 @@ SLIBRARY    = $(TARGETDIR)/libst.a
 DLIBRARY    = $(TARGETDIR)/libst.$(DSO_SUFFIX).$(VERSION)
 EXAMPLES    = examples
 
-MAJOR       = $(shell echo $(VERSION) | sed 's/^\([^\.]*\).*/\1/')
 LINKNAME    = libst.$(DSO_SUFFIX)
 SONAME      = libst.$(DSO_SUFFIX).$(MAJOR)
 FULLNAME    = libst.$(DSO_SUFFIX).$(VERSION)
-DESC        = st.pc
+
+ifeq ($(OS), CYGWIN)
+SONAME      = cygst.$(DSO_SUFFIX)
+SLIBRARY    = $(TARGETDIR)/libst.dll.a
+DLIBRARY    = $(TARGETDIR)/$(SONAME)
+LINKNAME    =
+# examples directory does not compile under cygwin
+EXAMPLES    =
+endif
+
+ifeq ($(OS), DARWIN)
+LINKNAME    = libst.$(DSO_SUFFIX)
+SONAME      = libst.$(MAJOR).$(DSO_SUFFIX)
+FULLNAME    = libst.$(VERSION).$(DSO_SUFFIX)
+endif
 
 ifeq ($(STATIC_ONLY), yes)
 LIBRARIES   = $(SLIBRARY)
@@ -254,8 +300,12 @@ $(SLIBRARY): $(OBJS)
 
 $(DLIBRARY): $(OBJS:%.o=%-pic.o)
 	$(LD) $(LDFLAGS) $^ -o $@
-	cd $(TARGETDIR); rm -f $(SONAME); $(LN) $(LNFLAGS) $(FULLNAME) $(SONAME)
-	cd $(TARGETDIR); rm -f $(LINKNAME); $(LN) $(LNFLAGS) $(FULLNAME) $(LINKNAME)
+	if test "$(LINKNAME)"; then                             \
+		cd $(TARGETDIR);				\
+		rm -f $(SONAME) $(LINKNAME);			\
+		$(LN) $(LNFLAGS) $(FULLNAME) $(SONAME);		\
+		$(LN) $(LNFLAGS) $(FULLNAME) $(LINKNAME);	\
+	fi
 
 $(HEADER): public.h
 	rm -f $@
@@ -278,7 +328,7 @@ clean:
 
 ifneq ($(SFLAGS),)
 # Compile with shared library options if it's a C file
-$(TARGETDIR)/%-pic.o: %.c
+$(TARGETDIR)/%-pic.o: %.c common.h md.h
 	$(CC) $(CFLAGS) $(SFLAGS) -c $< -o $@
 endif
 
@@ -298,6 +348,16 @@ aix-debug:
 	$(MAKE) OS="AIX" BUILD="DBG"
 aix-optimized:
 	$(MAKE) OS="AIX" BUILD="OPT"
+
+cygwin-debug:
+	$(MAKE) OS="CYGWIN" BUILD="DBG"
+cygwin-optimized:
+	$(MAKE) OS="CYGWIN" BUILD="OPT"
+
+darwin-debug:
+	$(MAKE) OS="DARWIN" BUILD="DBG"
+darwin-optimized:
+	$(MAKE) OS="DARWIN" BUILD="OPT"
 
 freebsd-debug:
 	$(MAKE) OS="FREEBSD" BUILD="DBG"
@@ -330,6 +390,11 @@ linux-ia64-debug:
 	$(MAKE) OS="LINUX_IA64" BUILD="DBG"
 linux-ia64-optimized:
 	$(MAKE) OS="LINUX_IA64" BUILD="OPT"
+
+netbsd-debug:
+	$(MAKE) OS="NETBSD" BUILD="DBG"
+netbsd-optimized:
+	$(MAKE) OS="NETBSD" BUILD="OPT"
 
 openbsd-debug:
 	$(MAKE) OS="OPENBSD" BUILD="DBG"
