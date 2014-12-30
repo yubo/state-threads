@@ -77,7 +77,7 @@ All machine-dependent feature test macros should be defined in the
 <P>
 The current version of the library is ported to IRIX 6.x (both 32 and 
 64 bit), Linux (kernel 2.x and glibc 2.x), Solaris 2.x (SunOS 5.x), AIX 4.x,
-HP-UX 11 (both 32 and 64 bit), Tru64/OSF1, and FreeBSD.
+HP-UX 11 (both 32 and 64 bit), Tru64/OSF1, OpenBSD and FreeBSD.
 <P>
 
 <A NAME="signals">
@@ -225,7 +225,8 @@ are multiplexed onto <B>P</B> processes and one of the processes crashes,
 only a fraction (<B>C/P</B>) of all connections will be lost.</LI>
 <P>
 <LI>To overcome per-process resource limitations imposed by the OS.  For
-example, the number of simultaneous connections (threads) per process is
+example, if <TT>select(2)</TT> is used for event polling, the number of
+simultaneous connections (threads) per process is
 limited by the <TT>FD_SETSIZE</TT> parameter (see <TT>select(2)</TT>).
 If <TT>FD_SETSIZE</TT> is equal to 1024 and each connection needs one file
 descriptor, then an application should create 10 processes to support 10,000

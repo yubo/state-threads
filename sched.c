@@ -1,36 +1,37 @@
 /* 
- * The contents of this file are subject to the Netscape Public
+ * The contents of this file are subject to the Mozilla Public
  * License Version 1.1 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of
- * the License at http://www.mozilla.org/NPL/
- *
+ * the License at http://www.mozilla.org/MPL/
+ * 
  * Software distributed under the License is distributed on an "AS
  * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
- *
- * The Original Code is Mozilla Communicator client code, released
- * March 31, 1998.
- *
+ * 
+ * The Original Code is the Netscape Portable Runtime library.
+ * 
  * The Initial Developer of the Original Code is Netscape
- * Communications Corporation. Portions created by Netscape are
- * Copyright (C) 1998-1999 Netscape Communications Corporation. All
+ * Communications Corporation.  Portions created by Netscape are 
+ * Copyright (C) 1994-2000 Netscape Communications Corporation.  All
  * Rights Reserved.
- *
- * Portions created by SGI are Copyright (C) 2000 Silicon Graphics, Inc.
- * All Rights Reserved.
- *
- * Contributor(s): Silicon Graphics, Inc.
- *
- * Alternatively, the contents of this file may be used under the terms
- * of the ____ license (the  "[____] License"), in which case the provisions
- * of [____] License are applicable instead of those above. If you wish to
- * allow use of your version of this file only under the terms of the [____]
- * License and not to allow others to use your version of this file under the
- * NPL, indicate your decision by deleting  the provisions above and replace
- * them with the notice and other provisions required by the [____] License.
- * If you do not delete the provisions above, a recipient may use your version
- * of this file under either the NPL or the [____] License.
+ * 
+ * Contributor(s):  Silicon Graphics, Inc.
+ * 
+ * Portions created by SGI are Copyright (C) 2000-2001 Silicon
+ * Graphics, Inc.  All Rights Reserved.
+ * 
+ * Alternatively, the contents of this file may be used under the
+ * terms of the GNU General Public License Version 2 or later (the
+ * "GPL"), in which case the provisions of the GPL are applicable 
+ * instead of those above.  If you wish to allow use of your 
+ * version of this file only under the terms of the GPL and not to
+ * allow others to use your version of this file under the MPL,
+ * indicate your decision by deleting the provisions above and
+ * replace them with the notice and other provisions required by
+ * the GPL.  If you do not delete the provisions above, a recipient
+ * may use your version of this file under either the MPL or the
+ * GPL.
  */
 
 /*
@@ -70,6 +71,7 @@ int st_poll(struct pollfd *pds, int npds, st_utime_t timeout)
     return -1;
   }
 
+#ifndef USE_POLL
   for (pd = pds; pd < epd; pd++) {
     if (pd->events & POLLIN) {
       FD_SET(pd->fd, &_ST_FD_READ_SET);
@@ -86,6 +88,9 @@ int st_poll(struct pollfd *pds, int npds, st_utime_t timeout)
     if (_ST_MAX_OSFD < pd->fd)
       _ST_MAX_OSFD = pd->fd;
   }
+#else
+  _ST_OSFD_CNT += npds;
+#endif  /* !USE_POLL */
 
   pq.pds = pds;
   pq.npds = npds;
@@ -102,6 +107,7 @@ int st_poll(struct pollfd *pds, int npds, st_utime_t timeout)
   if (pq.on_ioq) {
     /* If we timed out, the pollq might still be on the ioq. Remove it */
     _ST_DEL_IOQ(pq);
+#ifndef USE_POLL
     for (pd = pds; pd < epd; pd++) {
       if (pd->events & POLLIN) {
 	if (--_ST_FD_READ_CNT(pd->fd) == 0)
@@ -116,6 +122,10 @@ int st_poll(struct pollfd *pds, int npds, st_utime_t timeout)
 	  FD_CLR(pd->fd, &_ST_FD_EXCEPTION_SET);
       }
     }
+#else
+    _ST_OSFD_CNT -= npds;
+    ST_ASSERT(_ST_OSFD_CNT >= 0);
+#endif  /* !USE_POLL */
   } else {
     /* Count the number of ready descriptors */
     for (pd = pds; pd < epd; pd++) {
@@ -176,7 +186,16 @@ int st_init(void)
   ST_INIT_CLIST(&_ST_SLEEPQ);
   ST_INIT_CLIST(&_ST_ZOMBIEQ);
 
+#ifndef USE_POLL
   _st_this_vp.maxfd = -1;
+#else
+  _st_this_vp.fdcnt = 0;
+  _ST_POLLFDS = (struct pollfd *) malloc(ST_MIN_POLLFDS_SIZE *
+					 sizeof(struct pollfd));
+  if (!_ST_POLLFDS)
+    return -1;
+  _ST_POLLFDS_SIZE = ST_MIN_POLLFDS_SIZE;
+#endif  /* !USE_POLL */
   _st_this_vp.pagesize = getpagesize();
   _st_this_vp.last_clock = st_utime();
 
@@ -235,6 +254,8 @@ void *_st_idle_thread_start(void *arg)
 }
 
 
+#ifndef USE_POLL
+/* select() is used to poll file descriptors */
 void _st_vp_idle(void)
 {
   struct timeval timeout, *tvp;
@@ -419,6 +440,86 @@ void _st_find_bad_fd(void)
   }
 }
 
+#else  /* !USE_POLL */
+/* poll() is used to poll file descriptors */
+void _st_vp_idle(void)
+{
+  int timeout, nfd;
+  st_clist_t *q;
+  st_utime_t min_timeout;
+  st_pollq_t *pq;
+  int notify;
+  struct pollfd *pds, *epds, *pollfds;
+
+  /*
+   * Build up the array of struct pollfd to wait on.
+   * If existing array is not big enough, release it and allocate a new one.
+   */
+  ST_ASSERT(_ST_OSFD_CNT >= 0);
+  if (_ST_OSFD_CNT > _ST_POLLFDS_SIZE) {
+    free(_ST_POLLFDS);
+    _ST_POLLFDS = (struct pollfd *) malloc(_ST_OSFD_CNT *
+					   sizeof(struct pollfd));
+    ST_ASSERT(_ST_POLLFDS != NULL);
+    _ST_POLLFDS_SIZE = _ST_OSFD_CNT;
+  }
+  pollfds = _ST_POLLFDS;
+
+  /* Gather all descriptors into one array */
+  for (q = _ST_IOQ.next; q != &_ST_IOQ; q = q->next) {
+    pq = _ST_POLLQUEUE_PTR(q);
+    epds = pq->pds + pq->npds;
+
+    for (pds = pq->pds; pds < epds; pds++, pollfds++) {
+      ST_ASSERT(pollfds < _ST_POLLFDS + _ST_POLLFDS_SIZE);
+      *pollfds = *pds;
+    }
+  }
+
+  if (ST_CLIST_IS_EMPTY(&_ST_SLEEPQ)) {
+    timeout = -1;
+  } else {
+    min_timeout = (_ST_THREAD_PTR(_ST_SLEEPQ.next))->sleep;
+    timeout = (int) (min_timeout / 1000);
+  }
+
+  /* Check for I/O operations */
+  nfd = poll(_ST_POLLFDS, _ST_OSFD_CNT, timeout);
+
+  /* Notify threads that are associated with the selected descriptors */
+  if (nfd > 0) {
+    pollfds = _ST_POLLFDS;
+    for (q = _ST_IOQ.next; q != &_ST_IOQ; q = q->next) {
+      pq = _ST_POLLQUEUE_PTR(q);
+      epds = pq->pds + pq->npds;
+      notify = 0;
+
+      for (pds = pq->pds; pds < epds; pds++, pollfds++) {
+	ST_ASSERT(pollfds < _ST_POLLFDS + _ST_POLLFDS_SIZE);
+	ST_ASSERT(pollfds->fd == pds->fd);
+	pds->revents = pollfds->revents;
+	/* Negative fd's are ignored by poll() */
+	if (pds->fd >= 0 && pds->revents)
+	  notify = 1;
+      }
+      if (notify) {
+        ST_REMOVE_LINK(&pq->links);
+        pq->on_ioq = 0;
+
+        if (pq->thread->flags & _ST_FL_ON_SLEEPQ)
+          _ST_DEL_SLEEPQ(pq->thread, 0);
+        pq->thread->state = _ST_ST_RUNNABLE;
+        _ST_ADD_RUNQ(pq->thread);
+
+	_ST_OSFD_CNT -= pq->npds;
+	ST_ASSERT(_ST_OSFD_CNT >= 0);
+      }
+    }
+  }
+}
+
+#endif  /* !USE_POLL */
+
 
 void st_thread_exit(void *retval)
 {
@@ -495,6 +596,13 @@ int st_thread_join(st_thread_t *thread, void **retvalp)
 void _st_thread_main(void)
 {
   st_thread_t *thread = _ST_CURRENT_THREAD();
+
+  /*
+   * Cap the stack by zeroing out the saved return address register
+   * value. This allows some debugging/profiling tools to know when
+   * to stop unwinding the stack. It's a no-op on most platforms.
+   */
+  MD_CAP_STACK(&thread);
 
   /* Run thread main */
   thread->retval = (*thread->start)(thread->arg);
@@ -645,6 +753,9 @@ st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
   st_stack_t *stack;
   void **ptds;
   char *sp;
+#ifdef __ia64__
+  char *bsp;
+#endif
 
   /* Adjust stack size */
   if (stk_size == 0)
@@ -657,6 +768,21 @@ st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
   /* Allocate thread object and per-thread data off the stack */
 #if defined (MD_STACK_GROWS_DOWN)
   sp = stack->stk_top;
+#ifdef __ia64__
+  /*
+   * The stack segment is split in the middle. The upper half is used
+   * as backing store for the register stack which grows upward.
+   * The lower half is used for the traditional memory stack which
+   * grows downward. Both stacks start in the middle and grow outward
+   * from each other.
+   */
+  sp -= (stk_size >> 1);
+  bsp = sp;
+  /* Make register stack 64-byte aligned */
+  if ((unsigned long)bsp & 0x3f)
+    bsp = bsp + (0x40 - ((unsigned long)bsp & 0x3f));
+  stack->bsp = bsp + _ST_STACK_PAD_SIZE;
+#endif
   sp = sp - (ST_KEYS_MAX * sizeof(void *));
   ptds = (void **) sp;
   sp = sp - sizeof(st_thread_t);
@@ -690,7 +816,11 @@ st_thread_t *st_thread_create(void *(*start)(void *arg), void *arg,
   thread->start = start;
   thread->arg = arg;
 
+#ifndef __ia64__
   _ST_INIT_CONTEXT(thread, stack->sp, _st_thread_main);
+#else
+  _ST_INIT_CONTEXT(thread, stack->sp, stack->bsp, _st_thread_main);
+#endif
 
   /* If thread is joinable, allocate a termination condition variable */
   if (joinable) {

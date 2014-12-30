@@ -293,8 +293,9 @@ This function initializes the library runtime. It should be called near
 the beginning of the application's <TT>main()</TT> function before any other
 State Threads library function is called.<P>
 Among other things, this function limits the number of open file descriptors
-either to OS imposed per-process maximum number or to <TT>FD_SETSIZE</TT>,
-whichever is less (<TT>select(2), getrlimit(2)</TT>). This limit can be
+to the OS imposed per-process maximum number or, if <TT>select(2)</TT> is
+used, to <TT>FD_SETSIZE</TT>, whichever is less (<TT>getrlimit(2)</TT>).
+This limit can be
 retrieved by <A HREF=#st_getfdlimit>st_getfdlimit()</A>. It also sets the
 disposition of the <TT>SIGPIPE</TT> signal to <TT>SIG_IGN</TT> (to be ignored)
 (<TT>signal(5)</TT>).
@@ -388,8 +389,11 @@ is zero, the thread is unjoinable. Otherwise, it is joinable.
 See also <A HREF=#thread_join>st_thread_join()</A>.<P>
 <TT>stack_size</TT><P>
 Specifies your preference for the size of the stack, in bytes, associated
-with the newly created thread.  If you pass zero in this parameter, the
-default stack size (64 KB) will be used.
+with the newly created thread. If you pass zero in this parameter, the
+default stack size will be used. The default stack size is 128 KB on IA-64
+and 64 KB on all other platforms. On IA-64 only a half of <TT>stack_size</TT>
+bytes is used for the memory stack. The other half is used for the register
+stack backing store.
 <P>
 <H5>Returns</H5>
 Upon successful completion, a new thread identifier is returned (this
@@ -1227,7 +1231,11 @@ The State Threads library has the ability to "cache" the time value that is
 reported by the <TT>time(2)</TT> system call. If the time caching is enabled
 by calling this function with a non-zero argument, then the result value
 of <TT>time(2)</TT> will be stored and updated at most once per second. The
-cached time can be retrieved by <A HREF=#time>st_time()</A>.
+cached time can be retrieved by <A HREF=#time>st_time()</A>.<P>
+<B>Note:</B> There are some pathological cases (e.g., very heavy loads during
+application benchmarking) when a single thread runs for a long time without
+giving up control and the cached time value is not updated properly. If you
+<I>always</I> need "real-time" time values, don't enable the time caching.
 <P>
 <HR>
 <P>

@@ -1,36 +1,37 @@
 /* 
- * The contents of this file are subject to the Netscape Public
+ * The contents of this file are subject to the Mozilla Public
  * License Version 1.1 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of
- * the License at http://www.mozilla.org/NPL/
- *
+ * the License at http://www.mozilla.org/MPL/
+ * 
  * Software distributed under the License is distributed on an "AS
  * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
- *
- * The Original Code is Mozilla Communicator client code, released
- * March 31, 1998.
- *
+ * 
+ * The Original Code is the Netscape Portable Runtime library.
+ * 
  * The Initial Developer of the Original Code is Netscape
- * Communications Corporation. Portions created by Netscape are
- * Copyright (C) 1998-1999 Netscape Communications Corporation. All
+ * Communications Corporation.  Portions created by Netscape are 
+ * Copyright (C) 1994-2000 Netscape Communications Corporation.  All
  * Rights Reserved.
- *
- * Portions created by SGI are Copyright (C) 2000 Silicon Graphics, Inc.
- * All Rights Reserved.
- *
- * Contributor(s): Silicon Graphics, Inc.
- *
- * Alternatively, the contents of this file may be used under the terms
- * of the ____ license (the  "[____] License"), in which case the provisions
- * of [____] License are applicable instead of those above. If you wish to
- * allow use of your version of this file only under the terms of the [____]
- * License and not to allow others to use your version of this file under the
- * NPL, indicate your decision by deleting  the provisions above and replace
- * them with the notice and other provisions required by the [____] License.
- * If you do not delete the provisions above, a recipient may use your version
- * of this file under either the NPL or the [____] License.
+ * 
+ * Contributor(s):  Silicon Graphics, Inc.
+ * 
+ * Portions created by SGI are Copyright (C) 2000-2001 Silicon
+ * Graphics, Inc.  All Rights Reserved.
+ * 
+ * Alternatively, the contents of this file may be used under the
+ * terms of the GNU General Public License Version 2 or later (the
+ * "GPL"), in which case the provisions of the GPL are applicable 
+ * instead of those above.  If you wish to allow use of your 
+ * version of this file only under the terms of the GPL and not to
+ * allow others to use your version of this file under the MPL,
+ * indicate your decision by deleting the provisions above and
+ * replace them with the notice and other provisions required by
+ * the GPL.  If you do not delete the provisions above, a recipient
+ * may use your version of this file under either the MPL or the
+ * GPL.
  */
 
 /*
@@ -82,8 +83,10 @@ int _st_io_init(void)
   /* Set maximum number of open file descriptors */
   if (getrlimit(RLIMIT_NOFILE, &rlim) < 0)
     return -1;
+#ifndef USE_POLL
   if (rlim.rlim_max > FD_SETSIZE)
     rlim.rlim_max = FD_SETSIZE;
+#endif
   rlim.rlim_cur = rlim.rlim_max;
   if (setrlimit(RLIMIT_NOFILE, &rlim) < 0)
     return -1;
@@ -121,10 +124,12 @@ static st_netfd_t *_st_netfd_new(int osfd, int nonblock, int is_socket)
   st_netfd_t *fd;
   int flags = 1;
 
+#ifndef USE_POLL
   if (osfd >= FD_SETSIZE) {
     errno = EMFILE;
     return NULL;
   }
+#endif
 
   if (_st_netfd_freelist) {
     fd = _st_netfd_freelist;

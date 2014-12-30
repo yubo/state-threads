@@ -1,35 +1,36 @@
-# The contents of this file are subject to the Netscape Public
+# The contents of this file are subject to the Mozilla Public
 # License Version 1.1 (the "License"); you may not use this file
 # except in compliance with the License. You may obtain a copy of
-# the License at http://www.mozilla.org/NPL/
-#
+# the License at http://www.mozilla.org/MPL/
+# 
 # Software distributed under the License is distributed on an "AS
 # IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
 # implied. See the License for the specific language governing
 # rights and limitations under the License.
-#
-# The Original Code is Mozilla Communicator client code, released
-# March 31, 1998.
-#
+# 
+# The Original Code is the Netscape Portable Runtime library.
+# 
 # The Initial Developer of the Original Code is Netscape
-# Communications Corporation. Portions created by Netscape are
-# Copyright (C) 1998-1999 Netscape Communications Corporation. All
+# Communications Corporation.  Portions created by Netscape are 
+# Copyright (C) 1994-2000 Netscape Communications Corporation.  All
 # Rights Reserved.
-#
-# Portions created by SGI are Copyright (C) 2000 Silicon Graphics, Inc.
-# All Rights Reserved.
-#
-# Contributor(s): Silicon Graphics, Inc.
-#
-# Alternatively, the contents of this file may be used under the terms
-# of the ____ license (the  "[____] License"), in which case the provisions
-# of [____] License are applicable instead of those above. If you wish to
-# allow use of your version of this file only under the terms of the [____]
-# License and not to allow others to use your version of this file under the
-# NPL, indicate your decision by deleting  the provisions above and replace
-# them with the notice and other provisions required by the [____] License.
-# If you do not delete the provisions above, a recipient may use your version
-# of this file under either the NPL or the [____] License.
+# 
+# Contributor(s):  Silicon Graphics, Inc.
+# 
+# Portions created by SGI are Copyright (C) 2000-2001 Silicon
+# Graphics, Inc.  All Rights Reserved.
+# 
+# Alternatively, the contents of this file may be used under the
+# terms of the GNU General Public License Version 2 or later (the
+# "GPL"), in which case the provisions of the GPL are applicable 
+# instead of those above.  If you wish to allow use of your 
+# version of this file only under the terms of the GPL and not to
+# allow others to use your version of this file under the MPL,
+# indicate your decision by deleting the provisions above and
+# replace them with the notice and other provisions required by
+# the GPL.  If you do not delete the provisions above, a recipient
+# may use your version of this file under either the MPL or the
+# GPL.
 
 ##########################
 # Supported OSes:
@@ -41,9 +42,13 @@
 #OS         = IRIX
 #OS         = IRIX_64
 #OS         = LINUX
+#OS         = LINUX_IA64
+#OS         = OPENBSD
 #OS         = OSF1
 #OS         = SOLARIS
 
+# Please see the "Other possible defines" section below for
+# possible compilation options.
 ##########################
 
 CC          = cc
@@ -67,14 +72,16 @@ DSO_SUFFIX  = so
 # Platform section.
 # Possible targets:
 
-TARGETS     = aix-debug aix-optimized           \
-              freebsd-debug freebsd-optimized   \
-              hpux-debug hpux-optimized         \
-              hpux-64-debug hpux-64-optimized   \
-              irix-n32-debug irix-n32-optimized \
-              irix-64-debug irix-64-optimized   \
-              linux-debug linux-optimized       \
-              osf1-debug osf1-optimized         \
+TARGETS     = aix-debug aix-optimized               \
+              freebsd-debug freebsd-optimized       \
+              hpux-debug hpux-optimized             \
+              hpux-64-debug hpux-64-optimized       \
+              irix-n32-debug irix-n32-optimized     \
+              irix-64-debug irix-64-optimized       \
+              linux-debug linux-optimized           \
+              linux-ia64-debug linux-ia64-optimized \
+              openbsd-debug openbsd-optimized       \
+              osf1-debug osf1-optimized             \
               solaris-debug solaris-optimized
 
 #
@@ -125,7 +132,17 @@ LDFLAGS     = $(ABIFLAG) -shared
 OTHER_FLAGS = -fullwarn
 endif
 
-ifeq ($(OS), LINUX)
+ifeq (LINUX, $(findstring LINUX, $(OS)))
+ifeq ($(OS), LINUX_IA64)
+DEFINES     = -DLINUX
+EXTRA_OBJS  = $(TARGETDIR)/ia64asm.o
+endif
+LDFLAGS     = -shared
+OTHER_FLAGS = -Wall
+endif
+
+ifeq ($(OS), OPENBSD)
+CFLAGS      = -fPIC
 LDFLAGS     = -shared
 OTHER_FLAGS = -Wall
 endif
@@ -156,11 +173,17 @@ OTHER_FLAGS += -g
 DEFINES     += -DDEBUG
 endif
 
+##########################
 # Other possible defines:
-# Some platforms allow to define FD_SETSIZE, e.g.:
+# To use poll(2) instead of select(2) for events checking:
+# DEFINES += -DUSE_POLL
+#
+# Some platforms allow to define FD_SETSIZE (if select() is used), e.g.:
 # DEFINES += -DFD_SETSIZE=4096
+#
 # To use malloc(3) instead of mmap(2) for stack allocation:
 # DEFINES += -DMALLOC_STACK
+##########################
 
 CFLAGS      += $(DEFINES) $(OTHER_FLAGS)
 
@@ -169,6 +192,7 @@ OBJS        = $(TARGETDIR)/sched.o \
               $(TARGETDIR)/sync.o  \
               $(TARGETDIR)/key.o   \
               $(TARGETDIR)/io.o
+OBJS        += $(EXTRA_OBJS)
 HEADER      = $(TARGETDIR)/st.h
 SLIBRARY    = $(TARGETDIR)/libst.a
 DLIBRARY    = $(TARGETDIR)/libst.$(DSO_SUFFIX)
@@ -208,6 +232,9 @@ $(DLIBRARY): $(OBJS)
 $(HEADER): public.h
 	rm -f $@
 	cp public.h $@
+
+$(TARGETDIR)/%asm.o: %asm.S
+	$(CC) $(CFLAGS) -c $< -o $@
 
 $(TARGETDIR)/%.o: %.c common.h md.h
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -253,6 +280,15 @@ linux-debug:
 	$(MAKE) OS="LINUX" BUILD="DBG"
 linux-optimized:
 	$(MAKE) OS="LINUX" BUILD="OPT"
+linux-ia64-debug:
+	$(MAKE) OS="LINUX_IA64" BUILD="DBG"
+linux-ia64-optimized:
+	$(MAKE) OS="LINUX_IA64" BUILD="OPT"
+
+openbsd-debug:
+	$(MAKE) OS="OPENBSD" BUILD="DBG"
+openbsd-optimized:
+	$(MAKE) OS="OPENBSD" BUILD="OPT"
 
 osf1-debug:
 	$(MAKE) OS="OSF1" BUILD="DBG"

@@ -36,6 +36,8 @@
 # IRIX
 # IRIX_64
 # LINUX
+# LINUX_IA64
+# OPENBSD
 # OSF1
 # SOLARIS
 
@@ -73,7 +75,7 @@ endif
 # Platform section.
 #
 
-ifeq ($(OS), LINUX)
+ifeq (LINUX, $(findstring LINUX, $(OS)))
 LIBRESOLV   = -lresolv
 endif
 

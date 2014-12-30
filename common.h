@@ -1,36 +1,37 @@
 /* 
- * The contents of this file are subject to the Netscape Public
+ * The contents of this file are subject to the Mozilla Public
  * License Version 1.1 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of
- * the License at http://www.mozilla.org/NPL/
- *
+ * the License at http://www.mozilla.org/MPL/
+ * 
  * Software distributed under the License is distributed on an "AS
  * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
- *
- * The Original Code is Mozilla Communicator client code, released
- * March 31, 1998.
- *
+ * 
+ * The Original Code is the Netscape Portable Runtime library.
+ * 
  * The Initial Developer of the Original Code is Netscape
- * Communications Corporation. Portions created by Netscape are
- * Copyright (C) 1998-1999 Netscape Communications Corporation. All
+ * Communications Corporation.  Portions created by Netscape are 
+ * Copyright (C) 1994-2000 Netscape Communications Corporation.  All
  * Rights Reserved.
- *
- * Portions created by SGI are Copyright (C) 2000 Silicon Graphics, Inc.
- * All Rights Reserved.
- *
- * Contributor(s): Silicon Graphics, Inc.
- *
- * Alternatively, the contents of this file may be used under the terms
- * of the ____ license (the  "[____] License"), in which case the provisions
- * of [____] License are applicable instead of those above. If you wish to
- * allow use of your version of this file only under the terms of the [____]
- * License and not to allow others to use your version of this file under the
- * NPL, indicate your decision by deleting  the provisions above and replace
- * them with the notice and other provisions required by the [____] License.
- * If you do not delete the provisions above, a recipient may use your version
- * of this file under either the NPL or the [____] License.
+ * 
+ * Contributor(s):  Silicon Graphics, Inc.
+ * 
+ * Portions created by SGI are Copyright (C) 2000-2001 Silicon
+ * Graphics, Inc.  All Rights Reserved.
+ * 
+ * Alternatively, the contents of this file may be used under the
+ * terms of the GNU General Public License Version 2 or later (the
+ * "GPL"), in which case the provisions of the GPL are applicable 
+ * instead of those above.  If you wish to allow use of your 
+ * version of this file only under the terms of the GPL and not to
+ * allow others to use your version of this file under the MPL,
+ * indicate your decision by deleting the provisions above and
+ * replace them with the notice and other provisions required by
+ * the GPL.  If you do not delete the provisions above, a recipient
+ * may use your version of this file under either the MPL or the
+ * GPL.
  */
 
 /*
@@ -140,6 +141,9 @@ typedef struct _st_stack {
   char *stk_bottom;           /* Lowest address of stack's usable portion */
   char *stk_top;              /* Highest address of stack's usable portion */
   void *sp;                   /* Stack pointer from C's point of view */
+#ifdef __ia64__
+  void *bsp;                  /* Register stack backing store pointer */
+#endif
 } st_stack_t;
 
 
@@ -194,11 +198,17 @@ typedef struct _st_vp {
   st_clist_t sleep_q;         /* sleep queue for this vp */
   st_clist_t zombie_q;        /* zombie queue for this vp */
   st_utime_t sleep_max;
-  int maxfd;
   int pagesize;
 
+#ifndef USE_POLL
+  int maxfd;
   fd_set fd_read_set, fd_write_set, fd_exception_set;
   int fd_ref_cnts[FD_SETSIZE][3];
+#else
+  int fdcnt;
+  struct pollfd *ioq_pollfds;
+  int ioq_pollfds_size;
+#endif  /* !USE_POLL */
 } st_vp_t;
 
 
@@ -222,6 +232,7 @@ extern st_thread_t  *_st_this_thread;
 #define _ST_CURRENT_THREAD()            (_st_this_thread)
 #define _ST_SET_CURRENT_THREAD(_thread) (_st_this_thread = (_thread))
 
+#define _ST_SLEEPQMAX                   (_st_this_vp.sleep_max)
 #define _ST_PAGE_SIZE                   (_st_this_vp.pagesize)
 
 #define _ST_FD_READ_SET                 (_st_this_vp.fd_read_set)
@@ -232,8 +243,12 @@ extern st_thread_t  *_st_this_thread;
 #define _ST_FD_WRITE_CNT(fd)            (_st_this_vp.fd_ref_cnts[fd][1])
 #define _ST_FD_EXCEPTION_CNT(fd)        (_st_this_vp.fd_ref_cnts[fd][2])
 
-#define _ST_SLEEPQMAX                   (_st_this_vp.sleep_max)
 #define _ST_MAX_OSFD                    (_st_this_vp.maxfd)
+
+#define _ST_POLLFDS                     (_st_this_vp.ioq_pollfds)
+#define _ST_POLLFDS_SIZE                (_st_this_vp.ioq_pollfds_size)
+
+#define _ST_OSFD_CNT                    (_st_this_vp.fdcnt)
 
 #define _ST_IOQ                         (_st_this_vp.io_q)
 #define _ST_RUNQ                        (_st_this_vp.run_q)
@@ -303,8 +318,13 @@ extern st_thread_t  *_st_this_thread;
  */
 
 #define ST_UTIME_NO_TIMEOUT (-1ULL)
+#ifndef __ia64__
 #define ST_DEFAULT_STACK_SIZE (64*1024)
+#else
+#define ST_DEFAULT_STACK_SIZE (128*1024)  /* Includes register stack size */
+#endif
 #define ST_KEYS_MAX 16
+#define ST_MIN_POLLFDS_SIZE 64
 
 
 /*****************************************
