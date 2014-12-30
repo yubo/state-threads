@@ -31,6 +31,7 @@
 <DL><DD><A HREF=#thread_interrupt>st_thread_interrupt()</A></DD></DL>
 <DL><DD><A HREF=#sleep>st_sleep()</A></DD></DL>
 <DL><DD><A HREF=#sleep>st_usleep()</A></DD></DL>
+<DL><DD><A HREF=#randomize_stacks>st_randomize_stacks()</A></DD></DL>
 <P>
 <DD><A HREF=#priv><B>Per-Thread Private Data</B></A></DD>
 <P>
@@ -357,6 +358,7 @@ These functions operate on a thread object of type
 <DD><A HREF=#thread_interrupt>st_thread_interrupt()</A></DD>
 <DD><A HREF=#sleep>st_sleep()</A></DD>
 <DD><A HREF=#sleep>st_usleep()</A></DD>
+<DD><A HREF=#randomize_stacks>st_randomize_stacks()</A></DD>
 </DL>
 <P>
 <HR>
@@ -598,6 +600,47 @@ thus potentially allowing another thread to run.
 If <TT>-1</TT> is passed as a parameter to these functions, the calling thread
 will be suspended permanently. It can be resumed again by interrupting it via
 <A HREF=#thread_interrupt>st_thread_interrupt()</A>.
+<P>
+<HR>
+<P>
+<A NAME="randomize_stacks">
+<H4>st_randomize_stacks()</H4>
+</A>
+Turns stack base address randomization on or off.
+<P>
+<H5>Syntax</H5>
+
+<PRE>
+#include &lt;st.h&gt;
+
+int st_randomize_stacks(int on);
+</PRE>
+<P>
+<H5>Parameters</H5>
+<TT>st_randomize_stacks()</TT> has the following parameters:<P>
+<TT>on</TT><P>
+If this parameter has a non-zero value, the State Threads library
+randomizes the base addresses of stacks allocated for threads created
+after this call.  Otherwise new threads' stacks are typically page
+aligned.
+<P>
+<H5>Returns</H5>
+The previous state of stack randomization (a value of <TT>0</TT> if it
+was off and a nonzero value otherwise).
+<P>
+<H5>Description</H5>
+Randomizing state threads' stack bases may improve cache performance on
+some systems when large numbers of state threads all perform roughly the
+same work, as when they all start from the same root function.  On many
+modern systems the performance increase is negligible.  You should
+compare your application's performance with this feature on and off to
+see if you really need it.
+<P>
+When randomization is enabled, new stacks are allocated one page larger
+to accomodate the randomization.
+<P>
+This call affects only threads created afterward.  It has no effect on
+existing threads.
 <P>
 <HR>
 <P>

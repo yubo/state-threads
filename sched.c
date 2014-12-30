@@ -448,7 +448,6 @@ void _st_vp_idle(void)
   st_clist_t *q;
   st_utime_t min_timeout;
   st_pollq_t *pq;
-  int notify;
   struct pollfd *pds, *epds, *pollfds;
 
   /*
@@ -468,13 +467,10 @@ void _st_vp_idle(void)
   /* Gather all descriptors into one array */
   for (q = _ST_IOQ.next; q != &_ST_IOQ; q = q->next) {
     pq = _ST_POLLQUEUE_PTR(q);
-    epds = pq->pds + pq->npds;
-
-    for (pds = pq->pds; pds < epds; pds++, pollfds++) {
-      ST_ASSERT(pollfds < _ST_POLLFDS + _ST_POLLFDS_SIZE);
-      *pollfds = *pds;
-    }
+    memcpy(pollfds, pq->pds, sizeof(struct pollfd) * pq->npds);
+    pollfds += pq->npds;
   }
+  ST_ASSERT(pollfds <= _ST_POLLFDS + _ST_POLLFDS_SIZE);
 
   if (ST_CLIST_IS_EMPTY(&_ST_SLEEPQ)) {
     timeout = -1;
@@ -491,18 +487,12 @@ void _st_vp_idle(void)
     pollfds = _ST_POLLFDS;
     for (q = _ST_IOQ.next; q != &_ST_IOQ; q = q->next) {
       pq = _ST_POLLQUEUE_PTR(q);
-      epds = pq->pds + pq->npds;
-      notify = 0;
-
-      for (pds = pq->pds; pds < epds; pds++, pollfds++) {
-	ST_ASSERT(pollfds < _ST_POLLFDS + _ST_POLLFDS_SIZE);
-	ST_ASSERT(pollfds->fd == pds->fd);
-	pds->revents = pollfds->revents;
-	/* Negative fd's are ignored by poll() */
-	if (pds->fd >= 0 && pds->revents)
-	  notify = 1;
-      }
-      if (notify) {
+      epds = pollfds + pq->npds;
+      for (pds = pollfds; pds < epds; pds++)
+	if (pds->revents && pds->fd >= 0)   /* poll ignores negative fd's */
+	  break;
+      if (pds < epds) {
+	memcpy(pq->pds, pollfds, sizeof(struct pollfd) * pq->npds);
         ST_REMOVE_LINK(&pq->links);
         pq->on_ioq = 0;
 
@@ -514,6 +504,7 @@ void _st_vp_idle(void)
 	_ST_OSFD_CNT -= pq->npds;
 	ST_ASSERT(_ST_OSFD_CNT >= 0);
       }
+      pollfds = epds;
     }
   }
 }
