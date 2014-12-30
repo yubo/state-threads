@@ -743,7 +743,8 @@ static void *process_signals(void *arg)
 
   for ( ; ; ) {
     /* Read the next signal from the signal pipe */
-    if (st_read(sig_pipe[0], &signo, sizeof(int), -1) != sizeof(int))
+    if (st_read(sig_pipe[0], &signo, sizeof(int),
+     ST_UTIME_NO_TIMEOUT) != sizeof(int))
       err_sys_quit(errfd, "ERROR: process %d (pid %d): signal processor:"
 		   " st_read", my_index, my_pid);
 
@@ -857,7 +858,8 @@ static void *handle_connections(void *arg)
   fromlen = sizeof(from);
 
   while (WAIT_THREADS(i) <= max_wait_threads) {
-    cli_nfd = st_accept(srv_nfd, (struct sockaddr *)&from, &fromlen, -1);
+    cli_nfd = st_accept(srv_nfd, (struct sockaddr *)&from, &fromlen,
+     ST_UTIME_NO_TIMEOUT);
     if (cli_nfd == NULL) {
       err_sys_report(errfd, "ERROR: can't accept connection: st_accept");
       continue;
@@ -939,7 +941,7 @@ void handle_session(long srv_socket_index, st_netfd_t cli_nfd)
 		   inet_ntoa(*from));
     return;
   }
-  if (st_write(cli_nfd, resp, n, -1) != n) {
+  if (st_write(cli_nfd, resp, n, ST_UTIME_NO_TIMEOUT) != n) {
     err_sys_report(errfd, "WARN: can't write response to %s: st_write",
 		   inet_ntoa(*from));
     return;

@@ -33,7 +33,7 @@
 # GPL.
 
 # This is the full version of the libst library - modify carefully
-VERSION     = 1.7
+VERSION     = 1.8
 
 ##########################
 # Supported OSes:
@@ -138,6 +138,9 @@ ifeq ($(OS), FREEBSD)
 SFLAGS      = -fPIC
 LDFLAGS     = -shared -soname=$(SONAME) -lc
 OTHER_FLAGS = -Wall
+ifeq ($(shell test -f /usr/include/sys/event.h && echo yes), yes)
+DEFINES     += -DMD_HAVE_KQUEUE
+endif
 endif
 
 ifeq (HPUX, $(findstring HPUX, $(OS)))
@@ -170,6 +173,9 @@ EXTRA_OBJS  = $(TARGETDIR)/md.o
 SFLAGS      = -fPIC
 LDFLAGS     = -shared -soname=$(SONAME) -lc
 OTHER_FLAGS = -Wall
+ifeq ($(shell test -f /usr/include/sys/epoll.h && echo yes), yes)
+DEFINES     += -DMD_HAVE_EPOLL
+endif
 endif
 
 ifeq ($(OS), NETBSD)
@@ -182,6 +188,9 @@ ifeq ($(OS), OPENBSD)
 SFLAGS      = -fPIC
 LDFLAGS     = -shared -soname=$(SONAME) -lc
 OTHER_FLAGS = -Wall
+ifeq ($(shell test -f /usr/include/sys/event.h && echo yes), yes)
+DEFINES     += -DMD_HAVE_KQUEUE
+endif
 endif
 
 ifeq ($(OS), OSF1)
@@ -242,15 +251,34 @@ endif
 # To start with more than the default 64 initial pollfd slots
 # (but the table grows dynamically anyway):
 # DEFINES += -DST_MIN_POLLFDS_SIZE=<n>
+#
+# Note that you can also add these defines by specifying them as
+# make/gmake arguments (without editing this Makefile). For example:
+#
+# make EXTRA_CFLAGS=-DUSE_POLL <target>
+#
+# (replace make with gmake if needed).
+#
+# You can also modify the default selection of an alternative event
+# notification mechanism. E.g., to enable kqueue(2) support (if it's not
+# enabled by default):
+#
+# gmake EXTRA_CFLAGS=-DMD_HAVE_KQUEUE <target>
+#
+# or to disable default epoll(4) support:
+#
+# make EXTRA_CFLAGS=-UMD_HAVE_EPOLL <target>
+#
 ##########################
 
-CFLAGS      += $(DEFINES) $(OTHER_FLAGS)
+CFLAGS      += $(DEFINES) $(OTHER_FLAGS) $(EXTRA_CFLAGS)
 
 OBJS        = $(TARGETDIR)/sched.o \
               $(TARGETDIR)/stk.o   \
               $(TARGETDIR)/sync.o  \
               $(TARGETDIR)/key.o   \
-              $(TARGETDIR)/io.o
+              $(TARGETDIR)/io.o    \
+              $(TARGETDIR)/event.o
 OBJS        += $(EXTRA_OBJS)
 HEADER      = $(TARGETDIR)/st.h
 SLIBRARY    = $(TARGETDIR)/libst.a

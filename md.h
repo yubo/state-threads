@@ -118,6 +118,7 @@
 #define MD_USE_BSD_ANON_MMAP
 #define MD_ACCEPT_NB_INHERITED
 #define MD_ALWAYS_UNSERIALIZED_ACCEPT
+#define MD_HAVE_SOCKLEN_T
 
 #define MD_SETJMP(env) _setjmp(env)
 #define MD_LONGJMP(env, val) _longjmp(env, val)
@@ -601,6 +602,10 @@ extern int getpagesize(void);
 #else
 #error Unknown OS
 #endif /* OS */
+
+#if !defined(MD_HAVE_POLL) && !defined(MD_DONT_HAVE_POLL)
+#define MD_HAVE_POLL
+#endif
 
 #ifndef MD_STACK_PAD_SIZE
 #define MD_STACK_PAD_SIZE 128

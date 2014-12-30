@@ -198,6 +198,26 @@ Make selected stack frame return now? (y or n) y
 
 CHANGE LOG
 
+Changes from 1.7 to 1.8.
+--------------------------
+o  Added support for kqueue and epoll on platforms that support them.
+   Added ability to choose the event notification system at program
+   startup.
+
+o  Long-overdue public definitions of ST_UTIME_NO_TIMEOUT (-1ULL) and
+   ST_UTIME_NO_WAIT (0) [bug 1514436].
+
+o  Documentation patch for st_utime() [bug 1514484].
+
+o  Documentation patch for st_timecache_set() [bug 1514486].
+
+o  Documentation patch for st_netfd_serialize_accept() [bug 1514494].
+
+o  Added st_writev_resid() [rfe 1538344].
+
+o  Added st_readv_resid() [rfe 1538768] and, for symmetry, st_readv().
+
+
 Changes from 1.6 to 1.7.
 ------------------------
 o  Support glibc 2.4, which breaks programs that manipulate jump buffers.
