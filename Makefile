@@ -33,7 +33,7 @@
 # GPL.
 
 # This is the full version of the libst library - modify carefully
-VERSION     = 1.4
+VERSION     = 1.6
 
 ##########################
 # Supported OSes:
@@ -51,6 +51,7 @@ VERSION     = 1.4
 #OS         = OPENBSD
 #OS         = OSF1
 #OS         = SOLARIS
+#OS         = SOLARIS_64
 
 # Please see the "Other possible defines" section below for
 # possible compilation options.
@@ -95,7 +96,8 @@ TARGETS     = aix-debug aix-optimized               \
               netbsd-debug netbsd-optimized         \
               openbsd-debug openbsd-optimized       \
               osf1-debug osf1-optimized             \
-              solaris-debug solaris-optimized
+              solaris-debug solaris-optimized       \
+              solaris-64-debug solaris-64-optimized
 
 #
 # Platform specifics
@@ -192,13 +194,18 @@ RANLIB      = true
 LDFLAGS     = -shared -all -expect_unresolved "*"
 endif
 
-ifeq ($(OS), SOLARIS)
+ifeq (SOLARIS, $(findstring SOLARIS, $(OS)))
 TARGETDIR   = $(OS)_$(shell uname -r | sed 's/^5/2/')_$(BUILD)
 CC          = gcc
 LD          = gcc
 RANLIB      = true
 LDFLAGS     = -G
 OTHER_FLAGS = -Wall
+ifeq ($(OS), SOLARIS_64)
+DEFINES     = -DSOLARIS
+CFLAGS     += -m64
+LDFLAGS    += -m64
+endif
 endif
 
 #
@@ -232,6 +239,14 @@ endif
 #
 # To use malloc(3) instead of mmap(2) for stack allocation:
 # DEFINES += -DMALLOC_STACK
+#
+# To provision more than the default 16 thread-specific-data keys
+# (but not too many!):
+# DEFINES += -DST_KEYS_MAX=<n>
+#
+# To start with more than the default 64 initial pollfd slots
+# (but the table grows dynamically anyway):
+# DEFINES += -DST_MIN_POLLFDS_SIZE=<n>
 ##########################
 
 CFLAGS      += $(DEFINES) $(OTHER_FLAGS)
@@ -410,6 +425,10 @@ solaris-debug:
 	$(MAKE) OS="SOLARIS" BUILD="DBG"
 solaris-optimized:
 	$(MAKE) OS="SOLARIS" BUILD="OPT"
+solaris-64-debug:
+	$(MAKE) OS="SOLARIS_64" BUILD="DBG"
+solaris-64-optimized:
+	$(MAKE) OS="SOLARIS_64" BUILD="OPT"
 
 ##########################
 
